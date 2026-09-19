@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Morse Glyph Trainer</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#f6f7f9;
+    --panel:#ffffff;
+    --text:#17181a;
+    --muted:#68707a;
+    --border:#d9dde3;
+    --accent:#e83d3d;
+    --accent2:#2677ff;
+    --good:#0f8b55;
+    --bad:#c93333;
+    --shadow:0 10px 28px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#111317;
+      --panel:#1a1d22;
+      --text:#f2f4f7;
+      --muted:#a6adb7;
+      --border:#313640;
+      --accent:#ff5757;
+      --accent2:#6aa5ff;
+      --good:#4fd39a;
+      --bad:#ff7474;
+      --shadow:0 10px 28px rgba(0,0,0,.28);
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+  button,input,select{font:inherit}
+  button{cursor:pointer}
+  .app{
+    width:min(1120px,100%);
+    margin:0 auto;
+    padding:20px;
+  }
+  header{
+    display:flex;
+    gap:16px;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  h1{font-size:clamp(1.6rem,3vw,2.25rem);margin:0}
+  .subtitle{margin:.35rem 0 0;color:var(--muted);max-width:760px;line-height:1.45}
+  .tabs{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin:16px 0;
+  }
+  .tab,.btn{
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--text);
+    border-radius:10px;
+    padding:10px 14px;
+    min-height:44px;
+  }
+  .tab.active{
+    background:var(--text);
+    color:var(--panel);
+    border-color:var(--text);
+  }
+  .btn.primary{
+    background:var(--accent2);
+    color:white;
+    border-color:transparent;
+  }
+  .btn.danger{
+    background:var(--accent);
+    color:white;
+    border-color:transparent;
+  }
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .grid{
+    display:grid;
+    grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);
+    gap:16px;
+    align-items:start;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+  }
+  .stage{
+    padding:16px;
+  }
+  .stage-top{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .character-label{
+    font-size:1rem;
+    color:var(--muted);
+  }
+  .morse-readable{
+    font-size:clamp(1.6rem,4vw,2.5rem);
+    font-weight:800;
+    letter-spacing:.12em;
+    min-height:1.4em;
+  }
+  .morse-readable .sym{
+    display:inline-block;
+    opacity:.3;
+    transform:translateY(0);
+    transition:opacity .18s ease,transform .18s ease,color .18s ease;
+  }
+  .morse-readable .sym.on{
+    opacity:1;
+    color:var(--accent);
+    transform:translateY(-2px);
+  }
+  .svg-wrap{
+    width:min(100%,560px);
+    margin:10px auto 0;
+    aspect-ratio:1/1;
+  }
+  svg{width:100%;height:100%;display:block}
+  .glyph{
+    fill:var(--text);
+  }
+  .guide{
+    fill:none;
+    stroke:var(--border);
+    stroke-width:2;
+    stroke-dasharray:5 8;
+    opacity:.65;
+  }
+  .morse-mark{
+    stroke:var(--accent);
+    fill:var(--accent);
+    opacity:.12;
+    transition:opacity .16s ease,filter .16s ease,transform .16s ease;
+    transform-box:fill-box;
+    transform-origin:center;
+  }
+  .morse-mark.on{
+    opacity:1;
+    filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 75%, transparent));
+    transform:scale(1.08);
+  }
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content:center;
+    margin-top:12px;
+  }
+  .side{
+    padding:16px;
+  }
+  .side h2{font-size:1rem;margin:0 0 12px}
+  .field{margin:14px 0}
+  .field label{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    color:var(--muted);
+    font-size:.9rem;
+    margin-bottom:7px;
+  }
+  input[type=range]{width:100%}
+  .toggles{
+    display:grid;
+    gap:10px;
+  }
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:36px;
+  }
+  .toggle-row input{width:20px;height:20px}
+  .help{
+    color:var(--muted);
+    line-height:1.5;
+    font-size:.92rem;
+    margin-top:12px;
+  }
+  .drill-box{
+    margin-top:14px;
+    border-top:1px solid var(--border);
+    padding-top:14px;
+  }
+  .answer{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .answer-display{
+    min-width:150px;
+    flex:1;
+    min-height:48px;
+    border:1px solid var(--border);
+    background:var(--bg);
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    padding:0 12px;
+    font-size:1.55rem;
+    font-weight:800;
+    letter-spacing:.12em;
+  }
+  .feedback{
+    min-height:1.5em;
+    font-weight:700;
+    margin-top:10px;
+  }
+  .feedback.good{color:var(--good)}
+  .feedback.bad{color:var(--bad)}
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin-top:12px;
+  }
+  .stat{
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px;
+    text-align:center;
+  }
+  .stat strong{display:block;font-size:1.25rem}
+  .stat span{color:var(--muted);font-size:.8rem}
+  .chart{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(105px,1fr));
+    gap:10px;
+  }
+  .char-card{
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px;
+    min-height:100px;
+    display:grid;
+    place-items:center;
+    text-align:center;
+  }
+  .char-card:hover{border-color:var(--accent2)}
+  .char-card .big{font-size:2rem;font-weight:900}
+  .char-card .code{font-size:1rem;letter-spacing:.1em;color:var(--muted)}
+  .hidden{display:none!important}
+  .note{
+    margin-top:14px;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    color:var(--muted);
+    font-size:.9rem;
+    line-height:1.45;
+  }
+  kbd{
+    font:inherit;
+    font-size:.82em;
+    padding:2px 6px;
+    border:1px solid var(--border);
+    border-bottom-width:2px;
+    border-radius:6px;
+    background:var(--bg);
+  }
+  @media (max-width:800px){
+    .grid{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Morse Glyph Trainer</h1>
+      <p class="subtitle">Learn A–Z and 0–9 by watching the Morse dots and dashes animate directly over the character strokes. The overlay positions use manually aligned coordinates for the bold glyph shapes; they are not an official standardized alphabet.</p>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Trainer mode">
+    <button class="tab active" type="button" data-mode="learn">Learn</button>
+    <button class="tab" type="button" data-mode="drill">Drill</button>
+    <button class="tab" type="button" data-mode="chart">Chart</button>
+  </nav>
+
+  <section id="trainerView" class="grid">
+    <div class="panel stage">
+      <div class="stage-top">
+        <div>
+          <div class="character-label" id="characterLabel">Character A</div>
+          <div class="morse-readable" id="morseReadable" aria-live="polite"></div>
+        </div>
+        <div class="character-label" id="positionLabel">1 / 36</div>
+      </div>
+
+      <div class="svg-wrap">
+        <svg id="trainerSvg" viewBox="0 0 440 440" role="img" aria-labelledby="svgTitle svgDesc">
+          <title id="svgTitle">Morse character animation</title>
+          <desc id="svgDesc">A large alphanumeric character with Morse dots and dashes overlaid on the glyph.</desc>
+          <rect x="14" y="14" width="412" height="412" rx="24" class="guide"></rect>
+          <text id="glyphText" x="220" y="315" text-anchor="middle" class="glyph" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="300" font-weight="900">A</text>
+          <g id="marksLayer"></g>
+        </svg>
+      </div>
+
+      <div class="controls">
+        <button class="btn" type="button" id="prevBtn">← Previous</button>
+        <button class="btn primary" type="button" id="playBtn">▶ Animate</button>
+        <button class="btn" type="button" id="nextBtn">Next →</button>
+        <button class="btn" type="button" id="randomBtn">Random</button>
+      </div>
+    </div>
+
+    <aside class="panel side">
+      <h2>Animation settings</h2>
+      <div class="field">
+        <label for="speedRange"><span>Speed</span><strong id="speedLabel">1.0×</strong></label>
+        <input id="speedRange" type="range" min="0.5" max="2.0" step="0.1" value="1.0">
+      </div>
+      <div class="field">
+        <label for="pitchRange"><span>Tone</span><strong id="pitchLabel">650 Hz</strong></label>
+        <input id="pitchRange" type="range" min="350" max="950" step="25" value="650">
+      </div>
+      <div class="toggles">
+        <label class="toggle-row"><input id="soundToggle" type="checkbox" checked> Play Morse tone</label>
+        <label class="toggle-row"><input id="loopToggle" type="checkbox"> Auto-advance after animation</label>
+        <label class="toggle-row"><input id="codeToggle" type="checkbox" checked> Show Morse code</label>
+      </div>
+      <p class="help">Keyboard: <kbd>Space</kbd> animate, <kbd>←</kbd>/<kbd>→</kbd> change character. In Drill mode, use <kbd>.</kbd> and <kbd>-</kbd>, then <kbd>Enter</kbd>.</p>
+
+      <div id="drillBox" class="drill-box hidden">
+        <h2>Enter the Morse code</h2>
+        <div class="answer">
+          <div class="answer-display" id="answerDisplay" aria-live="polite">—</div>
+          <button class="btn" type="button" id="dotBtn">• Dot</button>
+          <button class="btn" type="button" id="dashBtn">— Dash</button>
+          <button class="btn" type="button" id="backBtn">⌫</button>
+        </div>
+        <div class="controls" style="justify-content:flex-start">
+          <button class="btn primary" type="button" id="submitBtn">Check</button>
+          <button class="btn" type="button" id="revealBtn">Reveal</button>
+          <button class="btn" type="button" id="newDrillBtn">New character</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+        <div class="stats">
+          <div class="stat"><strong id="correctStat">0</strong><span>Correct</span></div>
+          <div class="stat"><strong id="attemptStat">0</strong><span>Attempts</span></div>
+          <div class="stat"><strong id="accuracyStat">—</strong><span>Accuracy</span></div>
+        </div>
+      </div>
+
+      <div class="note">Tip: first watch a character several times with the code visible. Then switch to Drill mode and try to recall the sequence before using Reveal.</div>
+    </aside>
+  </section>
+
+  <section id="chartView" class="hidden">
+    <div class="chart" id="chartGrid"></div>
+  </section>
+
+  <footer style="margin-top:24px;padding:18px 8px 8px;text-align:center;color:var(--muted);font-size:.9rem;line-height:1.6">
+    <div>Copyright 2026 Chris Athanas</div>
+    <div>Link to source code: <a href="https://github.com/realityexpander/Morse-Code-Glyph-Trainer" target="_blank" rel="noopener noreferrer">Github Source</a></div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const ROOT = document.getElementById("app");
+  if (ROOT.dataset.ready === "1") return;
+  ROOT.dataset.ready = "1";
+
+  const MORSE = {
+    A:".-", B:"-...", C:"-.-.", D:"-..", E:".", F:"..-.", G:"--.", H:"....", I:"..",
+    J:".---", K:"-.-", L:".-..", M:"--", N:"-.", O:"---", P:".--.", Q:"--.-", R:".-.",
+    S:"...", T:"-", U:"..-", V:"...-", W:".--", X:"-..-", Y:"-.--", Z:"--..",
+    "0":"-----","1":".----","2":"..---","3":"...--","4":"....-","5":".....",
+    "6":"-....","7":"--...","8":"---..","9":"----."
+  };
+
+  const ORDER = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"];
+
+  // Coordinates are chosen as visual mnemonic anchors over typical bold sans-serif glyphs.
+  // x/y use the SVG's 440×440 coordinate system. a = dash angle in degrees.
+  const P = {
+    A:[[220,127,-63],[220,258,0]],
+    B:[[155,207,90],[219,127,0],[220,206,0],[222,296,0]],
+    C:[[266,129,35],[149,200,90],[184,286,35],[288,266,18]],
+    D:[[158,209,90],[266,137,90],[266,280,0]],
+    E:[[174,204,0]],
+    F:[[283,126,90],[176,131,0],[174,274,90],[246,208,90]],
+    G:[[271,131,35],[179,286,35],[305,214,0]],
+    H:[[149,127,90],[151,290,90],[292,127,90],[291,290,90]],
+    I:[[220,124,90],[220,290,90]],
+    J:[[264,122,0],[264,187,90],[251,269,-51],[173,276,41]],
+    K:[[269,136,-49],[155,236,-42],[275,268,62]],
+    L:[[173,128,90],[173,263,90],[229,288,0],[285,288,0]],
+    M:[[126,263,90],[316,262,90]],
+    N:[[148,264,90],[291,284,56]],
+    O:[[159,151,-51],[285,152,54],[220,294,0]],
+    P:[[162,168,90],[221,120,0],[220,211,0],[289,166,0]],
+    Q:[[160,149,-45],[281,150,45],[273,279,0],[163,278,38]],
+    R:[[157,297,90],[221,210,0],[285,297,42]],
+    S:[[215,117,-18],[215,204,0],[216,299,18]],
+    T:[[219,126,0]],
+    U:[[149,128,90],[289,127,90],[220,294,0]],
+    V:[[143,124,68],[296,124,0],[221,267,-68],[221,302,0]],
+    W:[[103,121,74],[167,267,-70],[305,267,-76]],
+    X:[[169,140,58],[256,164,-45],[183,248,-45],[270,267,57]],
+    Y:[[169,147,57],[222,207,-45],[272,148,-57],[221,272,-90]],
+    Z:[[188,123,0],[228,199,-45],[146,291,-45],[297,292,0]],
+    "0":[[219,116,0],[277,198,90],[259,279,-45],[186,281,45],[163,197,90]],
+    "1":[[165,174,-45],[238,131,90],[237,199,90],[237,269,90],[237,325,0]],
+    "2":[[165,151,0],[216,121,0],[271,154,-90],[181,271,-45],[262,291,0]],
+    "3":[[167,140,0],[223,201,-18],[165,271,0],[263,142,53],[264,282,-40]],
+    "4":[[261,118,90],[152,247,0],[259,249,0],[298,249,90],[261,329,0]],
+    "5":[[276,125,0],[183,127,90],[171,200,0],[278,240,18],[173,282,0]],
+    "6":[[257,124,33],[168,167,90],[169,254,90],[226,301,0],[275,254,90]],
+    "7":[[174,125,0],[262,125,0],[247,182,-65],[219,239,-65],[203,296,-65]],
+    "8":[[219,115,0],[221,201,0],[222,297,0],[201,334,90],[249,334,0]],
+    "9":[[159,173,-90],[215,117,0],[276,177,90],[264,279,-46],[173,282,0]]
+  };
+
+  const els = {
+    tabs:[...ROOT.querySelectorAll(".tab")],
+    trainerView:document.getElementById("trainerView"),
+    chartView:document.getElementById("chartView"),
+    chartGrid:document.getElementById("chartGrid"),
+    glyphText:document.getElementById("glyphText"),
+    marksLayer:document.getElementById("marksLayer"),
+    morseReadable:document.getElementById("morseReadable"),
+    characterLabel:document.getElementById("characterLabel"),
+    positionLabel:document.getElementById("positionLabel"),
+    prevBtn:document.getElementById("prevBtn"),
+    nextBtn:document.getElementById("nextBtn"),
+    playBtn:document.getElementById("playBtn"),
+    randomBtn:document.getElementById("randomBtn"),
+    speedRange:document.getElementById("speedRange"),
+    speedLabel:document.getElementById("speedLabel"),
+    pitchRange:document.getElementById("pitchRange"),
+    pitchLabel:document.getElementById("pitchLabel"),
+    soundToggle:document.getElementById("soundToggle"),
+    loopToggle:document.getElementById("loopToggle"),
+    codeToggle:document.getElementById("codeToggle"),
+    drillBox:document.getElementById("drillBox"),
+    answerDisplay:document.getElementById("answerDisplay"),
+    dotBtn:document.getElementById("dotBtn"),
+    dashBtn:document.getElementById("dashBtn"),
+    backBtn:document.getElementById("backBtn"),
+    submitBtn:document.getElementById("submitBtn"),
+    revealBtn:document.getElementById("revealBtn"),
+    newDrillBtn:document.getElementById("newDrillBtn"),
+    feedback:document.getElementById("feedback"),
+    correctStat:document.getElementById("correctStat"),
+    attemptStat:document.getElementById("attemptStat"),
+    accuracyStat:document.getElementById("accuracyStat"),
+    svgTitle:document.getElementById("svgTitle"),
+    svgDesc:document.getElementById("svgDesc")
+  };
+
+  let mode = "learn";
+  let index = 0;
+  let runToken = 0;
+  let answer = "";
+  let correct = 0;
+  let attempts = 0;
+  let audioCtx = null;
+  let autoTimer = null;
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function currentChar(){ return ORDER[index]; }
+
+  function clearAutoTimer(){
+    if(autoTimer){ clearTimeout(autoTimer); autoTimer = null; }
+  }
+
+  function stopAnimation(){
+    runToken++;
+    clearAutoTimer();
+    [...els.marksLayer.children].forEach(n => n.classList.remove("on"));
+    [...els.morseReadable.children].forEach(n => n.classList.remove("on"));
+    els.playBtn.disabled = false;
+    els.playBtn.textContent = "▶ Animate";
+  }
+
+  function markElement(symbol, pos, i){
+    const NS = "http://www.w3.org/2000/svg";
+    const [x,y,a=0] = pos;
+    let node;
+    if(symbol === "."){
+      node = document.createElementNS(NS,"circle");
+      node.setAttribute("cx",x);
+      node.setAttribute("cy",y);
+      node.setAttribute("r","9");
+    }else{
+      node = document.createElementNS(NS,"line");
+      const len = 50;
+      const rad = a*Math.PI/180;
+      const dx = Math.cos(rad)*len/2;
+      const dy = Math.sin(rad)*len/2;
+      node.setAttribute("x1",x-dx);
+      node.setAttribute("y1",y-dy);
+      node.setAttribute("x2",x+dx);
+      node.setAttribute("y2",y+dy);
+      node.setAttribute("stroke-width","15");
+      node.setAttribute("stroke-linecap","round");
+    }
+    node.classList.add("morse-mark");
+    node.dataset.i = i;
+    return node;
+  }
+
+  function renderCharacter({hideCode = false} = {}){
+    stopAnimation();
+    const ch = currentChar();
+    const code = MORSE[ch];
+    els.glyphText.textContent = ch;
+    els.characterLabel.textContent = mode === "drill" ? "Identify this character's Morse code" : `Character ${ch}`;
+    els.positionLabel.textContent = `${index+1} / ${ORDER.length}`;
+    els.svgTitle.textContent = `Morse code for ${ch}`;
+    els.svgDesc.textContent = `Large ${ch} with ${code.length} Morse marks positioned on the glyph.`;
+    els.marksLayer.replaceChildren();
+    els.morseReadable.replaceChildren();
+
+    const points = P[ch];
+    [...code].forEach((sym,i)=>{
+      els.marksLayer.appendChild(markElement(sym, points[i] || [220,220,0], i));
+      const span = document.createElement("span");
+      span.className = "sym";
+      span.textContent = sym === "." ? "•" : "—";
+      span.dataset.i = i;
+      els.morseReadable.appendChild(span);
+    });
+
+    const shouldHide = hideCode || !els.codeToggle.checked || mode === "drill";
+    els.morseReadable.style.visibility = shouldHide ? "hidden" : "visible";
+  }
+
+  function getAudioContext(){
+    if(!els.soundToggle.checked) return null;
+    if(!audioCtx){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return null;
+      audioCtx = new Ctx();
+    }
+    if(audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+    return audioCtx;
+  }
+
+  function beep(ms){
+    const ctx = getAudioContext();
+    if(!ctx) return Promise.resolve();
+    return new Promise(resolve=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = Number(els.pitchRange.value);
+      gain.gain.setValueAtTime(0.0001,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18,ctx.currentTime+0.01);
+      gain.gain.setValueAtTime(0.18,ctx.currentTime+Math.max(.01,ms/1000-.025));
+      gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+ms/1000);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime+ms/1000+.02);
+      osc.onended = resolve;
+    });
+  }
+
+  async function animateCurrent({revealCode = true} = {}){
+    stopAnimation();
+    const token = ++runToken;
+    els.playBtn.disabled = true;
+    els.playBtn.textContent = "Animating…";
+    const ch = currentChar();
+    const code = MORSE[ch];
+    if(revealCode) els.morseReadable.style.visibility = "visible";
+
+    const speed = Number(els.speedRange.value);
+    const dit = Math.round(180 / speed);
+    const gap = Math.round(105 / speed);
+
+    const marks = [...els.marksLayer.children];
+    const textSyms = [...els.morseReadable.children];
+
+    for(let i=0;i<code.length;i++){
+      if(token !== runToken) return;
+      marks[i]?.classList.add("on");
+      textSyms[i]?.classList.add("on");
+      const dur = code[i] === "." ? dit : dit*3;
+      await Promise.all([beep(dur), sleep(dur)]);
+      if(token !== runToken) return;
+      await sleep(gap);
+    }
+
+    if(token !== runToken) return;
+    els.playBtn.disabled = false;
+    els.playBtn.textContent = "↻ Replay";
+
+    if(els.loopToggle.checked && mode === "learn"){
+      autoTimer = setTimeout(()=>{
+        index = (index+1)%ORDER.length;
+        renderCharacter();
+        animateCurrent();
+      }, Math.round(700/speed));
+    }
+  }
+
+  function move(delta){
+    index = (index + delta + ORDER.length) % ORDER.length;
+    answer = "";
+    updateAnswer();
+    clearFeedback();
+    renderCharacter();
+  }
+
+  function randomize(){
+    let next = index;
+    if(ORDER.length > 1){
+      while(next === index) next = Math.floor(Math.random()*ORDER.length);
+    }
+    index = next;
+    answer = "";
+    updateAnswer();
+    clearFeedback();
+    renderCharacter({hideCode: mode === "drill"});
+  }
+
+  function setMode(nextMode){
+    mode = nextMode;
+    stopAnimation();
+    els.tabs.forEach(t=>t.classList.toggle("active",t.dataset.mode===mode));
+    const chart = mode === "chart";
+    els.chartView.classList.toggle("hidden",!chart);
+    els.trainerView.classList.toggle("hidden",chart);
+    els.drillBox.classList.toggle("hidden",mode!=="drill");
+    els.prevBtn.classList.toggle("hidden",mode==="drill");
+    els.nextBtn.classList.toggle("hidden",mode==="drill");
+    els.randomBtn.classList.toggle("hidden",mode==="drill");
+    els.playBtn.textContent = mode==="drill" ? "▶ Reveal animation" : "▶ Animate";
+    if(!chart){
+      if(mode === "drill") randomize();
+      else renderCharacter();
+    }
+  }
+
+  function updateAnswer(){
+    els.answerDisplay.textContent = answer ? answer.replaceAll(".","•").replaceAll("-","—") : "—";
+  }
+
+  function clearFeedback(){
+    els.feedback.textContent = "";
+    els.feedback.className = "feedback";
+  }
+
+  function appendAnswer(sym){
+    if(mode !== "drill") return;
+    if(answer.length >= 5) return;
+    answer += sym;
+    updateAnswer();
+    clearFeedback();
+  }
+
+  function backspaceAnswer(){
+    answer = answer.slice(0,-1);
+    updateAnswer();
+    clearFeedback();
+  }
+
+  function updateStats(){
+    els.correctStat.textContent = correct;
+    els.attemptStat.textContent = attempts;
+    els.accuracyStat.textContent = attempts ? `${Math.round(correct/attempts*100)}%` : "—";
+  }
+
+  function submitAnswer(){
+    if(mode !== "drill") return;
+    if(!answer){
+      els.feedback.textContent = "Enter at least one dot or dash.";
+      els.feedback.className = "feedback bad";
+      return;
+    }
+    attempts++;
+    const expected = MORSE[currentChar()];
+    if(answer === expected){
+      correct++;
+      els.feedback.textContent = `Correct — ${currentChar()} is ${expected.replaceAll(".","•").replaceAll("-","—")}`;
+      els.feedback.className = "feedback good";
+      els.morseReadable.style.visibility = "visible";
+      animateCurrent({revealCode:true});
+    }else{
+      els.feedback.textContent = "Not quite. Try again or use Reveal.";
+      els.feedback.className = "feedback bad";
+    }
+    updateStats();
+  }
+
+  function reveal(){
+    els.morseReadable.style.visibility = "visible";
+    els.feedback.textContent = `${currentChar()} = ${MORSE[currentChar()].replaceAll(".","•").replaceAll("-","—")}`;
+    els.feedback.className = "feedback";
+    animateCurrent({revealCode:true});
+  }
+
+  function buildChart(){
+    const frag = document.createDocumentFragment();
+    ORDER.forEach((ch,i)=>{
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "char-card";
+      b.setAttribute("aria-label",`${ch}: ${MORSE[ch]}`);
+      const big = document.createElement("div");
+      big.className = "big";
+      big.textContent = ch;
+      const code = document.createElement("div");
+      code.className = "code";
+      code.textContent = MORSE[ch].replaceAll(".","•").replaceAll("-","—");
+      b.append(big,code);
+      b.addEventListener("click",()=>{
+        index = i;
+        setMode("learn");
+      });
+      frag.appendChild(b);
+    });
+    els.chartGrid.appendChild(frag);
+  }
+
+  els.tabs.forEach(t=>t.addEventListener("click",()=>setMode(t.dataset.mode)));
+  els.prevBtn.addEventListener("click",()=>move(-1));
+  els.nextBtn.addEventListener("click",()=>move(1));
+  els.randomBtn.addEventListener("click",randomize);
+  els.playBtn.addEventListener("click",()=>animateCurrent({revealCode:true}));
+
+  els.speedRange.addEventListener("input",()=>{
+    els.speedLabel.textContent = `${Number(els.speedRange.value).toFixed(1)}×`;
+  });
+  els.pitchRange.addEventListener("input",()=>{
+    els.pitchLabel.textContent = `${els.pitchRange.value} Hz`;
+  });
+  els.codeToggle.addEventListener("change",()=>{
+    if(mode !== "drill") els.morseReadable.style.visibility = els.codeToggle.checked ? "visible" : "hidden";
+  });
+
+  els.dotBtn.addEventListener("click",()=>appendAnswer("."));
+  els.dashBtn.addEventListener("click",()=>appendAnswer("-"));
+  els.backBtn.addEventListener("click",backspaceAnswer);
+  els.submitBtn.addEventListener("click",submitAnswer);
+  els.revealBtn.addEventListener("click",reveal);
+  els.newDrillBtn.addEventListener("click",randomize);
+
+  ROOT.addEventListener("keydown",(e)=>{
+    const tag = e.target?.tagName?.toLowerCase();
+    if(tag === "input" || tag === "select" || tag === "textarea" || tag === "button") return;
+
+    if(mode === "drill"){
+      if(e.key === "."){ e.preventDefault(); appendAnswer("."); }
+      else if(e.key === "-"){ e.preventDefault(); appendAnswer("-"); }
+      else if(e.key === "Backspace"){ e.preventDefault(); backspaceAnswer(); }
+      else if(e.key === "Enter"){ e.preventDefault(); submitAnswer(); }
+      else if(e.key === " "){ e.preventDefault(); reveal(); }
+      return;
+    }
+
+    if(mode === "learn"){
+      if(e.key === " "){ e.preventDefault(); animateCurrent({revealCode:true}); }
+      else if(e.key === "ArrowLeft"){ e.preventDefault(); move(-1); }
+      else if(e.key === "ArrowRight"){ e.preventDefault(); move(1); }
+    }
+  });
+
+  buildChart();
+  renderCharacter();
+  updateAnswer();
+  updateStats();
+})();
+</script>
+</body>
+</html>
