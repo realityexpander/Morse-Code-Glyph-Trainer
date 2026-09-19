@@ -6,6 +6,8 @@ A single-page HTML/JavaScript Morse code learning app that teaches **A–Z** and
 
 <img width="400" height="355" alt="Screen Recording 2026-09-19 at 6 13 23 PM" src="https://github.com/user-attachments/assets/b64e9a6f-3fd0-4e17-b836-9f552a0b6d0b" />
 
+Deployed live here: https://realityexpander.github.io/Morse-Code-Glyph-Trainer/
+
 
 The app combines a visual mnemonic approach with Morse audio, animation, drilling, and a full character reference chart. A separate **Glyph Editor** is included as an addendum tool for manually adjusting the exact position and angle of each Morse dot and dash.
 
