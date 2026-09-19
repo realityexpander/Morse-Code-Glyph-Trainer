@@ -2,7 +2,7 @@
 
 A single-page HTML/JavaScript Morse code learning app that teaches **A–Z** and **0–9** using animated dots and dashes positioned directly over the strokes of each alphanumeric character.
 
-<img width="350" alt="image" src="https://github.com/user-attachments/assets/b57b5c13-aab3-4dbf-97c7-250a3b0fe2ce" />
+<img width="450" alt="image" src="https://github.com/user-attachments/assets/b57b5c13-aab3-4dbf-97c7-250a3b0fe2ce" />
 
 
 The app combines a visual mnemonic approach with Morse audio, animation, drilling, and a full character reference chart. A separate **Glyph Editor** is included as an addendum tool for manually adjusting the exact position and angle of each Morse dot and dash.
