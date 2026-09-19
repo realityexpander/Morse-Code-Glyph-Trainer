@@ -28,6 +28,10 @@ The app combines a visual mnemonic approach with Morse audio, animation, drillin
 - No server required
 - Works as a single standalone HTML page
 
+- Based on these Glyphs
+<img width="451" alt="image" src="https://github.com/user-attachments/assets/d5640524-4f22-45d6-8162-d0f56298f524" />
+
+
 ## Files
 
 The project consists primarily of two standalone HTML files:
