@@ -51,7 +51,7 @@ morse_overlay_position_editor.html
 README.md
 ```
 
-### `morse_glyph_trainer_aligned.html`
+### `index.html`
 
 The main Morse learning and drilling application.
 
@@ -71,7 +71,7 @@ No build system, package manager, or web server is required.
 2. Locate:
 
 ```text
-morse_glyph_trainer_aligned.html
+index.html
 ```
 
 3. Double-click the file, or open it with a modern web browser.
@@ -88,14 +88,14 @@ Because the application is completely self-contained, it can run directly from t
 ## Option 2: Clone with Git
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
-cd YOUR-REPOSITORY
+git clone https://github.com/realityexpander/Morse-Code-Glyph-Trainer.git
+cd Morse-Code-Glyph-Trainer
 ```
 
 Then open:
 
 ```text
-morse_glyph_trainer_aligned.html
+index.html
 ```
 
 in your browser.
@@ -104,13 +104,7 @@ in your browser.
 
 The app can also be hosted directly with GitHub Pages.
 
-For the simplest setup, rename the main application file:
-
-```text
-morse_glyph_trainer_aligned.html
-```
-
-to:
+For the simplest setup, use:
 
 ```text
 index.html
@@ -150,7 +144,8 @@ GitHub will provide the public URL for the application.
 The main application has three modes:
 
 - **Learn**
-- **Drill**
+- **Drill Dots & Dashes**
+- **Drill Glyphs **
 - **Chart**
 
 ## Learn Mode
