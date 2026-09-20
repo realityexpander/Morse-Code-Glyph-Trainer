@@ -305,7 +305,7 @@
       </div>
       <div class="audio-status" id="audioStatus" aria-live="polite"></div>
 
-      <p class="help" id="keyboardHelp">Keyboard: <kbd>Space</kbd> animate, <kbd>←</kbd>/<kbd>→</kbd> change character.</p>
+      <p class="help" id="keyboardHelp">Keyboard: <kbd>Space</kbd> replay animation + tones, <kbd>←</kbd>/<kbd>→</kbd> change character, <kbd>A</kbd>–<kbd>Z</kbd> / <kbd>0</kbd>–<kbd>9</kbd> jump to glyph.</p>
 
       <div id="drillDotsBox" class="drill-box hidden">
         <h2>Which character is this?</h2>
@@ -452,7 +452,10 @@
   let glyphAnswer = "";
   let revealed = false;
   let audioCtx = null;
+  let audioMaster = null;
   let audioUnlocked = false;
+  let audioInitPromise = null;
+  const activeToneNodes = new Set();
   let lastRandom = -1;
 
   const stats = {
@@ -476,9 +479,19 @@
     node.setAttribute("y2",node.dataset.y2);
   }
 
+  function stopAllTones(){
+    for(const item of [...activeToneNodes]){
+      try{ item.osc.stop(); }catch(_){}
+      try{ item.osc.disconnect(); }catch(_){}
+      try{ item.gain.disconnect(); }catch(_){}
+      activeToneNodes.delete(item);
+    }
+  }
+
   function stopAnimation(){
     runToken++;
     clearAutoTimer();
+    stopAllTones();
     if(learnStartTimer){
       clearTimeout(learnStartTimer);
       learnStartTimer = null;
@@ -640,58 +653,148 @@
     }
   }
 
+  function resetAudioSystem(){
+    stopAllTones();
+    try{ audioMaster?.disconnect(); }catch(_){}
+    audioCtx = null;
+    audioMaster = null;
+    audioUnlocked = false;
+    audioInitPromise = null;
+  }
+
   async function unlockAudio(){
     if(!els.soundToggle.checked) return null;
-    try{
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if(!Ctx){
-        els.audioStatus.textContent = "Web Audio is not supported by this browser.";
-        return null;
-      }
-      if(!audioCtx) audioCtx = new Ctx();
-      if(audioCtx.state !== "running") await audioCtx.resume();
 
-      if(!audioUnlocked && audioCtx.state === "running"){
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        gain.gain.value = 0.00001;
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.01);
-        audioUnlocked = true;
+    if(audioInitPromise) return audioInitPromise;
+
+    audioInitPromise = (async()=>{
+      try{
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if(!Ctx){
+          els.audioStatus.textContent = "Web Audio is not supported by this browser.";
+          return null;
+        }
+
+        if(audioCtx?.state === "closed"){
+          resetAudioSystem();
+        }
+
+        if(!audioCtx){
+          audioCtx = new Ctx();
+          audioMaster = audioCtx.createGain();
+          audioMaster.gain.value = 0.95;
+          audioMaster.connect(audioCtx.destination);
+
+          audioCtx.onstatechange = ()=>{
+            if(audioCtx?.state === "closed"){
+              resetAudioSystem();
+            }
+          };
+        }
+
+        if(audioCtx.state !== "running"){
+          try{ await audioCtx.resume(); }catch(_){}
+        }
+
+        // Safari/WebKit can transiently remain suspended. Retry once on a user gesture.
+        if(audioCtx.state !== "running"){
+          await sleep(25);
+          try{ await audioCtx.resume(); }catch(_){}
+        }
+
+        if(audioCtx.state !== "running"){
+          els.audioStatus.textContent = "Sound is paused by the browser. Click or press Space to enable it.";
+          return null;
+        }
+
+        if(!audioUnlocked){
+          // Prime the output graph with a nearly silent oscillator.
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.00001,audioCtx.currentTime);
+          osc.connect(gain);
+          gain.connect(audioMaster);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.02);
+          osc.onended = ()=>{
+            try{ osc.disconnect(); }catch(_){}
+            try{ gain.disconnect(); }catch(_){}
+          };
+          audioUnlocked = true;
+        }
+
         els.audioStatus.textContent = "";
+        return audioCtx;
+      }catch(err){
+        els.audioStatus.textContent = "Sound could not initialize. Click or press Space and try again.";
+        return null;
+      }finally{
+        audioInitPromise = null;
       }
-      return audioCtx.state === "running" ? audioCtx : null;
-    }catch(err){
-      els.audioStatus.textContent = "Sound is blocked. Click or tap the page, then replay.";
-      return null;
-    }
+    })();
+
+    return audioInitPromise;
   }
 
   async function tone(ms){
     if(!els.soundToggle.checked) return;
-    const ctx = await unlockAudio();
+
+    let ctx = await unlockAudio();
     if(!ctx) return;
 
-    const start = ctx.currentTime + 0.005;
+    // Re-check immediately before scheduling the tone in case the browser suspended audio.
+    if(ctx.state !== "running"){
+      try{ await ctx.resume(); }catch(_){}
+      if(ctx.state !== "running"){
+        resetAudioSystem();
+        ctx = await unlockAudio();
+        if(!ctx) return;
+      }
+    }
+
+    const start = ctx.currentTime + 0.008;
     const stop = start + ms/1000;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
+    const item = {osc,gain};
+
+    activeToneNodes.add(item);
 
     osc.type = "sine";
     osc.frequency.setValueAtTime(Number(els.pitchRange.value),start);
     gain.gain.setValueAtTime(0.0001,start);
-    gain.gain.exponentialRampToValueAtTime(0.20,start+0.01);
-    gain.gain.setValueAtTime(0.20,Math.max(start+0.011,stop-0.018));
+    gain.gain.exponentialRampToValueAtTime(0.20,start+0.008);
+    gain.gain.setValueAtTime(0.20,Math.max(start+0.01,stop-0.018));
     gain.gain.exponentialRampToValueAtTime(0.0001,stop);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(start);
-    osc.stop(stop+0.02);
+    gain.connect(audioMaster);
 
-    await sleep(ms);
-    try{ osc.disconnect(); gain.disconnect(); }catch(_){}
+    await new Promise(resolve=>{
+      let finished = false;
+
+      const cleanup = ()=>{
+        if(finished) return;
+        finished = true;
+        activeToneNodes.delete(item);
+        try{ osc.disconnect(); }catch(_){}
+        try{ gain.disconnect(); }catch(_){}
+        resolve();
+      };
+
+      osc.onended = cleanup;
+
+      try{
+        osc.start(start);
+        osc.stop(stop+0.025);
+      }catch(_){
+        cleanup();
+        return;
+      }
+
+      // Fallback for browsers that occasionally fail to fire onended.
+      setTimeout(cleanup,ms+120);
+    });
   }
 
   async function animateCurrent({allowAutoAdvance=false}={}){
@@ -1007,6 +1110,18 @@
     if(els.soundToggle.checked) unlockAudio();
   },{passive:true});
 
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState === "visible" && els.soundToggle.checked && audioUnlocked){
+      unlockAudio();
+    }
+  });
+
+  window.addEventListener("pageshow",()=>{
+    if(els.soundToggle.checked && audioUnlocked){
+      unlockAudio();
+    }
+  });
+
   els.tabs.forEach(t=>t.addEventListener("click",async()=>{
     await unlockAudio();
     setMode(t.dataset.mode);
@@ -1042,10 +1157,11 @@
 
   els.soundToggle.addEventListener("change",async()=>{
     if(els.soundToggle.checked){
-      await unlockAudio();
-      if(audioCtx?.state === "running") els.audioStatus.textContent = "Audio ready.";
+      const ctx = await unlockAudio();
+      if(ctx?.state === "running") els.audioStatus.textContent = "Audio ready.";
       setTimeout(()=>{ if(els.audioStatus.textContent === "Audio ready.") els.audioStatus.textContent = ""; },1400);
     }else{
+      stopAllTones();
       els.audioStatus.textContent = "";
     }
   });
