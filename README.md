@@ -351,7 +351,7 @@ A:[
 
 # Addendum: Glyph Editor
 
-<img width="500" height="1502" alt="image" src="https://github.com/user-attachments/assets/bcb6c2ec-cc7a-48b1-bc72-01b48b43b101" />
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/bcb6c2ec-cc7a-48b1-bc72-01b48b43b101" />
 
 
 The repository includes a separate utility:
