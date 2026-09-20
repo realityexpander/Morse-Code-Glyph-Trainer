@@ -452,10 +452,7 @@
   let glyphAnswer = "";
   let revealed = false;
   let audioCtx = null;
-  let audioMaster = null;
   let audioUnlocked = false;
-  let audioInitPromise = null;
-  const activeToneNodes = new Set();
   let lastRandom = -1;
 
   const stats = {
@@ -479,19 +476,9 @@
     node.setAttribute("y2",node.dataset.y2);
   }
 
-  function stopAllTones(){
-    for(const item of [...activeToneNodes]){
-      try{ item.osc.stop(); }catch(_){}
-      try{ item.osc.disconnect(); }catch(_){}
-      try{ item.gain.disconnect(); }catch(_){}
-      activeToneNodes.delete(item);
-    }
-  }
-
   function stopAnimation(){
     runToken++;
     clearAutoTimer();
-    stopAllTones();
     if(learnStartTimer){
       clearTimeout(learnStartTimer);
       learnStartTimer = null;
@@ -653,148 +640,58 @@
     }
   }
 
-  function resetAudioSystem(){
-    stopAllTones();
-    try{ audioMaster?.disconnect(); }catch(_){}
-    audioCtx = null;
-    audioMaster = null;
-    audioUnlocked = false;
-    audioInitPromise = null;
-  }
-
   async function unlockAudio(){
     if(!els.soundToggle.checked) return null;
-
-    if(audioInitPromise) return audioInitPromise;
-
-    audioInitPromise = (async()=>{
-      try{
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if(!Ctx){
-          els.audioStatus.textContent = "Web Audio is not supported by this browser.";
-          return null;
-        }
-
-        if(audioCtx?.state === "closed"){
-          resetAudioSystem();
-        }
-
-        if(!audioCtx){
-          audioCtx = new Ctx();
-          audioMaster = audioCtx.createGain();
-          audioMaster.gain.value = 0.95;
-          audioMaster.connect(audioCtx.destination);
-
-          audioCtx.onstatechange = ()=>{
-            if(audioCtx?.state === "closed"){
-              resetAudioSystem();
-            }
-          };
-        }
-
-        if(audioCtx.state !== "running"){
-          try{ await audioCtx.resume(); }catch(_){}
-        }
-
-        // Safari/WebKit can transiently remain suspended. Retry once on a user gesture.
-        if(audioCtx.state !== "running"){
-          await sleep(25);
-          try{ await audioCtx.resume(); }catch(_){}
-        }
-
-        if(audioCtx.state !== "running"){
-          els.audioStatus.textContent = "Sound is paused by the browser. Click or press Space to enable it.";
-          return null;
-        }
-
-        if(!audioUnlocked){
-          // Prime the output graph with a nearly silent oscillator.
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          gain.gain.setValueAtTime(0.00001,audioCtx.currentTime);
-          osc.connect(gain);
-          gain.connect(audioMaster);
-          osc.start(audioCtx.currentTime);
-          osc.stop(audioCtx.currentTime + 0.02);
-          osc.onended = ()=>{
-            try{ osc.disconnect(); }catch(_){}
-            try{ gain.disconnect(); }catch(_){}
-          };
-          audioUnlocked = true;
-        }
-
-        els.audioStatus.textContent = "";
-        return audioCtx;
-      }catch(err){
-        els.audioStatus.textContent = "Sound could not initialize. Click or press Space and try again.";
+    try{
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx){
+        els.audioStatus.textContent = "Web Audio is not supported by this browser.";
         return null;
-      }finally{
-        audioInitPromise = null;
       }
-    })();
+      if(!audioCtx) audioCtx = new Ctx();
+      if(audioCtx.state !== "running") await audioCtx.resume();
 
-    return audioInitPromise;
+      if(!audioUnlocked && audioCtx.state === "running"){
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.00001;
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.01);
+        audioUnlocked = true;
+        els.audioStatus.textContent = "";
+      }
+      return audioCtx.state === "running" ? audioCtx : null;
+    }catch(err){
+      els.audioStatus.textContent = "Sound is blocked. Click or tap the page, then replay.";
+      return null;
+    }
   }
 
   async function tone(ms){
     if(!els.soundToggle.checked) return;
-
-    let ctx = await unlockAudio();
+    const ctx = await unlockAudio();
     if(!ctx) return;
 
-    // Re-check immediately before scheduling the tone in case the browser suspended audio.
-    if(ctx.state !== "running"){
-      try{ await ctx.resume(); }catch(_){}
-      if(ctx.state !== "running"){
-        resetAudioSystem();
-        ctx = await unlockAudio();
-        if(!ctx) return;
-      }
-    }
-
-    const start = ctx.currentTime + 0.008;
+    const start = ctx.currentTime + 0.005;
     const stop = start + ms/1000;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const item = {osc,gain};
-
-    activeToneNodes.add(item);
 
     osc.type = "sine";
     osc.frequency.setValueAtTime(Number(els.pitchRange.value),start);
     gain.gain.setValueAtTime(0.0001,start);
-    gain.gain.exponentialRampToValueAtTime(0.20,start+0.008);
-    gain.gain.setValueAtTime(0.20,Math.max(start+0.01,stop-0.018));
+    gain.gain.exponentialRampToValueAtTime(0.20,start+0.01);
+    gain.gain.setValueAtTime(0.20,Math.max(start+0.011,stop-0.018));
     gain.gain.exponentialRampToValueAtTime(0.0001,stop);
 
     osc.connect(gain);
-    gain.connect(audioMaster);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(stop+0.02);
 
-    await new Promise(resolve=>{
-      let finished = false;
-
-      const cleanup = ()=>{
-        if(finished) return;
-        finished = true;
-        activeToneNodes.delete(item);
-        try{ osc.disconnect(); }catch(_){}
-        try{ gain.disconnect(); }catch(_){}
-        resolve();
-      };
-
-      osc.onended = cleanup;
-
-      try{
-        osc.start(start);
-        osc.stop(stop+0.025);
-      }catch(_){
-        cleanup();
-        return;
-      }
-
-      // Fallback for browsers that occasionally fail to fire onended.
-      setTimeout(cleanup,ms+120);
-    });
+    await sleep(ms);
+    try{ osc.disconnect(); gain.disconnect(); }catch(_){}
   }
 
   async function animateCurrent({allowAutoAdvance=false}={}){
@@ -1110,18 +1007,6 @@
     if(els.soundToggle.checked) unlockAudio();
   },{passive:true});
 
-  document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState === "visible" && els.soundToggle.checked && audioUnlocked){
-      unlockAudio();
-    }
-  });
-
-  window.addEventListener("pageshow",()=>{
-    if(els.soundToggle.checked && audioUnlocked){
-      unlockAudio();
-    }
-  });
-
   els.tabs.forEach(t=>t.addEventListener("click",async()=>{
     await unlockAudio();
     setMode(t.dataset.mode);
@@ -1157,11 +1042,10 @@
 
   els.soundToggle.addEventListener("change",async()=>{
     if(els.soundToggle.checked){
-      const ctx = await unlockAudio();
-      if(ctx?.state === "running") els.audioStatus.textContent = "Audio ready.";
+      await unlockAudio();
+      if(audioCtx?.state === "running") els.audioStatus.textContent = "Audio ready.";
       setTimeout(()=>{ if(els.audioStatus.textContent === "Audio ready.") els.audioStatus.textContent = ""; },1400);
     }else{
-      stopAllTones();
       els.audioStatus.textContent = "";
     }
   });
@@ -1227,8 +1111,12 @@
     const editable = tag === "input" || tag === "textarea" || tag === "select";
     const key = e.key;
     const lower = key.length === 1 ? key.toLowerCase() : key;
+    const systemModifier = e.metaKey || e.ctrlKey || e.altKey || e.getModifierState?.("AltGraph");
 
     if(mode === "learn" && !editable){
+      // Keep Command, Control, Option/Alt and AltGraph combinations available
+      // to the browser/OS. Shift remains allowed so both "a" and "A" work.
+      if(systemModifier) return;
       if(key === " "){
         e.preventDefault();
         await unlockAudio();
@@ -1286,9 +1174,30 @@
   });
 
   buildChart();
-  playLearnGlyph();
   updateStats("drillDots");
   updateStats("drillGlyphs");
+
+  // Delay initial audio setup until the document has fully loaded and painted.
+  // This keeps the proven v8 audio implementation while avoiding startup races.
+  const startInitialLearn = ()=>{
+    setTimeout(()=>{
+      if(mode !== "learn") return;
+
+      // Begin setting up/resuming audio first, without blocking the UI.
+      void unlockAudio();
+
+      // Give the AudioContext a short head start, then show and play the glyph.
+      setTimeout(()=>{
+        if(mode === "learn") playLearnGlyph();
+      },40);
+    },150);
+  };
+
+  if(document.readyState === "complete"){
+    startInitialLearn();
+  }else{
+    window.addEventListener("load",startInitialLearn,{once:true});
+  }
 })();
 </script>
 </body>
