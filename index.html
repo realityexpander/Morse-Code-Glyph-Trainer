@@ -246,7 +246,7 @@
 <div class="app" id="app">
   <header>
     <h1>Morse Glyph Trainer</h1>
-    <p class="subtitle">Learn A–Z and 0–9 by watching Morse dots and dashes animate directly over manually aligned character glyphs.</p>
+    <p class="subtitle">Learn standard Morse code A–Z and 0–9 using animated dots and dashes drawn over glyphs of characters via mnemonic learning method.</p>
   </header>
 
   <nav class="tabs" aria-label="Trainer mode">
@@ -855,7 +855,7 @@
       els.modeNote.textContent = "Drill Dots & Dashes hides the character while preserving the positioned Morse pattern.";
       newDotsQuestion();
     }else if(mode === "drillGlyphs"){
-      els.keyboardHelp.innerHTML = 'Keyboard: <kbd>-</kbd> dash, <kbd>.</kbd> dot, <kbd>Delete</kbd>/<kbd>Backspace</kbd> erase, <kbd>Enter</kbd> check / next after reveal, <kbd>R</kbd> reveal, <kbd>A</kbd> replay animation + tones, <kbd>N</kbd> new glyph.';
+      els.keyboardHelp.innerHTML = 'Keyboard: <kbd>-</kbd> or <kbd>/</kbd> dash, <kbd>.</kbd> dot, <kbd>Delete</kbd>/<kbd>Backspace</kbd> erase, <kbd>Enter</kbd> check / next after reveal, <kbd>R</kbd> reveal, <kbd>A</kbd> replay animation + tones, <kbd>N</kbd> new glyph.';
       els.modeNote.textContent = "Drill Glyphs shows only the character until you Check or Reveal the Morse pattern.";
       newGlyphQuestion();
     }
@@ -1027,7 +1027,7 @@
     }
 
     if(mode === "drillGlyphs" && !editable){
-      if(key === "-"){
+      if(key === "-" || key === "/"){
         e.preventDefault();
         appendGlyphAnswer("-");
       }else if(key === "."){
