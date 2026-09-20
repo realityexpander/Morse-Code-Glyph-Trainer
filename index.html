@@ -152,6 +152,12 @@
     font-weight:800;
     letter-spacing:.12em;
   }
+  .answer-display.hint-empty{
+    font-size:1.1625rem;
+    font-weight:600;
+    letter-spacing:0;
+    opacity:.5;
+  }
   .char-answer{
     width:100%;
     min-height:48px;
@@ -320,10 +326,12 @@
         <h2>Enter the Morse code</h2>
         <p class="help">The glyph is shown alone. Enter dots and dashes. The overlay and tones appear only after Check or Reveal. After a result is shown, press Enter for a new glyph.</p>
         <div class="answer">
-          <div class="answer-display" id="glyphAnswerDisplay" aria-live="polite">enter dash-dot code</div>
+          <div class="answer-display hint-empty" id="glyphAnswerDisplay" aria-live="polite">Enter dash-dot code</div>
+        </div>
+        <div class="controls" style="justify-content:flex-start;margin-top:8px">
           <button class="btn" type="button" id="dotBtn">• Dot</button>
           <button class="btn" type="button" id="dashBtn">— Dash</button>
-          <button class="btn" type="button" id="backBtn">⌫</button>
+          <button class="btn" type="button" id="backBtn">⌫ Delete</button>
         </div>
         <div class="controls" style="justify-content:flex-start">
           <button class="btn primary" type="button" id="checkGlyphBtn">Check</button>
@@ -685,9 +693,16 @@
     els.newDotsBtn.classList.toggle("primary", enterMeansNew);
   }
 
+  function updateGlyphEnterHighlight(){
+    const enterMeansNew = mode === "drillGlyphs" && revealed;
+    els.checkGlyphBtn.classList.toggle("primary", !enterMeansNew);
+    els.newGlyphBtn.classList.toggle("primary", enterMeansNew);
+  }
+
   function resetGlyphAnswer(){
     glyphAnswer = "";
-    els.glyphAnswerDisplay.textContent = "enter dash-dot code";
+    els.glyphAnswerDisplay.textContent = "Enter dash-dot code";
+    els.glyphAnswerDisplay.classList.add("hint-empty");
   }
 
   function newDotsQuestion(){
@@ -707,6 +722,7 @@
     revealed = false;
     resetGlyphAnswer();
     clearFeedback("glyphs");
+    updateGlyphEnterHighlight();
     renderCharacter();
   }
 
@@ -746,13 +762,20 @@
     if(mode !== "drillGlyphs" || revealed || glyphAnswer.length >= 5) return;
     glyphAnswer += sym;
     els.glyphAnswerDisplay.textContent = prettyCode(glyphAnswer);
+    els.glyphAnswerDisplay.classList.remove("hint-empty");
     clearFeedback("glyphs");
   }
 
   function backspaceGlyphAnswer(){
     if(revealed) return;
     glyphAnswer = glyphAnswer.slice(0,-1);
-    els.glyphAnswerDisplay.textContent = glyphAnswer ? prettyCode(glyphAnswer) : "enter dash-dot code";
+    if(glyphAnswer){
+      els.glyphAnswerDisplay.textContent = prettyCode(glyphAnswer);
+      els.glyphAnswerDisplay.classList.remove("hint-empty");
+    }else{
+      els.glyphAnswerDisplay.textContent = "Enter dash-dot code";
+      els.glyphAnswerDisplay.classList.add("hint-empty");
+    }
     clearFeedback("glyphs");
   }
 
@@ -782,6 +805,7 @@
     }
 
     revealed = true;
+    updateGlyphEnterHighlight();
     renderCharacter();
     await animateCurrent();
   }
@@ -806,6 +830,7 @@
     els.charAnswer.readOnly = false;
     els.charAnswer.value = "";
     updateDotsEnterHighlight();
+    updateGlyphEnterHighlight();
 
     els.tabs.forEach(t=>t.classList.toggle("active",t.dataset.mode===mode));
     const isChart = mode === "chart";
