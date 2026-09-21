@@ -4,7 +4,7 @@ A single-page HTML/JavaScript Morse code learning app that teaches **A–Z** and
 
 <img width="467" alt="image" src="https://github.com/user-attachments/assets/3f4b2d35-75ce-4938-bc30-6e36d39c22c3" />
 
-<img width="600" height="319" alt="Screen Recording 2026-09-20 at 10 27 01 PM" src="https://github.com/user-attachments/assets/352d3f6c-6e5f-4e76-b6ba-e1955006bdb0" />
+<img width="600" alt="Screen Recording 2026-09-20 at 10 27 01 PM" src="https://github.com/user-attachments/assets/352d3f6c-6e5f-4e76-b6ba-e1955006bdb0" />
 
 Deployed live here: https://realityexpander.github.io/Morse-Code-Glyph-Trainer/
 
