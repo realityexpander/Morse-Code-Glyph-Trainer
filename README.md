@@ -2,9 +2,9 @@
 
 A single-page HTML/JavaScript Morse code learning app that teaches **A–Z** and **0–9** using animated dots and dashes positioned directly over the strokes of each alphanumeric character.
 
-<img width="450" alt="image" src="https://github.com/user-attachments/assets/97e3a7f7-7644-4141-9dcf-cbaa8a37b5da" />
+<img width="467" alt="image" src="https://github.com/user-attachments/assets/3f4b2d35-75ce-4938-bc30-6e36d39c22c3" />
 
-<img width="400" height="355" alt="Screen Recording 2026-09-19 at 6 13 23 PM" src="https://github.com/user-attachments/assets/b64e9a6f-3fd0-4e17-b836-9f552a0b6d0b" />
+<img width="400" height="319" alt="Screen Recording 2026-09-20 at 10 27 01 PM" src="https://github.com/user-attachments/assets/352d3f6c-6e5f-4e76-b6ba-e1955006bdb0" />
 
 Deployed live here: https://realityexpander.github.io/Morse-Code-Glyph-Trainer/
 
