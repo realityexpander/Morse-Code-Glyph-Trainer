@@ -78,6 +78,28 @@
     flex-wrap:wrap;
   }
   .character-label{font-size:1rem;color:var(--muted)}
+  .stage-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .browser-muted{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:30px;
+    height:30px;
+    color:var(--muted);
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:var(--bg);
+  }
+  .browser-muted svg{
+    width:18px;
+    height:18px;
+    display:block;
+  }
+  .browser-muted.hidden{display:none}
   .morse-readable{
     font-size:clamp(1.6rem,4vw,2.5rem);
     font-weight:800;
@@ -266,7 +288,15 @@
           <div class="character-label" id="characterLabel">Character A</div>
           <div class="morse-readable" id="morseReadable" aria-live="polite"></div>
         </div>
-        <div class="character-label" id="positionLabel">1 / 36</div>
+        <div class="stage-status">
+          <span class="browser-muted" id="browserMuted" role="status" aria-label="Audio muted until first interaction" title="Audio muted until first click, touch, or key press">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"></path>
+              <path d="M17 9l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </span>
+          <div class="character-label" id="positionLabel">1 / 36</div>
+        </div>
       </div>
 
       <div class="svg-wrap">
@@ -431,7 +461,7 @@
     pitchRange:$("pitchRange"), pitchLabel:$("pitchLabel"),
     soundToggle:$("soundToggle"), loopToggle:$("loopToggle"), codeToggle:$("codeToggle"),
     autoAdvanceRow:$("autoAdvanceRow"), showCodeRow:$("showCodeRow"),
-    keyboardHelp:$("keyboardHelp"), audioStatus:$("audioStatus"), modeNote:$("modeNote"),
+    keyboardHelp:$("keyboardHelp"), audioStatus:$("audioStatus"), browserMuted:$("browserMuted"), modeNote:$("modeNote"),
     drillDotsBox:$("drillDotsBox"), charAnswer:$("charAnswer"),
     checkDotsBtn:$("checkDotsBtn"), revealDotsBtn:$("revealDotsBtn"), newDotsBtn:$("newDotsBtn"),
     dotsFeedback:$("dotsFeedback"), dotsCorrectStat:$("dotsCorrectStat"),
@@ -640,6 +670,11 @@
     }
   }
 
+  function updateBrowserMutedIndicator(){
+    const unlocked = audioCtx?.state === "running" && audioUnlocked;
+    els.browserMuted.classList.toggle("hidden",unlocked);
+  }
+
   async function unlockAudio(){
     if(!els.soundToggle.checked) return null;
     try{
@@ -661,6 +696,7 @@
         audioUnlocked = true;
         els.audioStatus.textContent = "";
       }
+      updateBrowserMutedIndicator();
       return audioCtx.state === "running" ? audioCtx : null;
     }catch(err){
       els.audioStatus.textContent = "Sound is blocked. Click or tap the page, then replay.";
@@ -999,13 +1035,28 @@
 
   // Audio is explicitly unlocked on a genuine user gesture. This makes Safari/iOS
   // and other autoplay-restricted browsers much more reliable.
-  document.addEventListener("pointerdown",()=>{
-    if(els.soundToggle.checked) unlockAudio();
-  },{passive:true});
+  let firstInteractionHandled = false;
 
-  document.addEventListener("keydown",()=>{
-    if(els.soundToggle.checked) unlockAudio();
-  },{passive:true});
+  async function handleFirstInteraction(){
+    if(firstInteractionHandled || !els.soundToggle.checked) return;
+
+    const ctx = await unlockAudio();
+    if(ctx?.state === "running"){
+      firstInteractionHandled = true;
+      updateBrowserMutedIndicator();
+
+      // If the opening Learn animation already ran silently, replay the
+      // current glyph once now that the browser has enabled audio.
+      if(mode === "learn"){
+        animateCurrent({allowAutoAdvance:true});
+      }
+    }
+  }
+
+  document.addEventListener("pointerdown",handleFirstInteraction,{passive:true,capture:true});
+  document.addEventListener("touchstart",handleFirstInteraction,{passive:true,capture:true});
+  document.addEventListener("mousedown",handleFirstInteraction,{passive:true,capture:true});
+  document.addEventListener("keydown",handleFirstInteraction,{capture:true});
 
   els.tabs.forEach(t=>t.addEventListener("click",async()=>{
     await unlockAudio();
@@ -1176,6 +1227,7 @@
   buildChart();
   updateStats("drillDots");
   updateStats("drillGlyphs");
+  updateBrowserMutedIndicator();
 
   // Delay initial audio setup until the document has fully loaded and painted.
   // This keeps the proven v8 audio implementation while avoiding startup races.
