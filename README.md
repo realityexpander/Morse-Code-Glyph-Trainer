@@ -1,5 +1,8 @@
 # Morse Glyph Trainer
 
+<img width="200" alt="image" src="https://github.com/user-attachments/assets/dcc382ff-2d37-404e-b983-3f4455e8bdb2" />
+
+
 A single-page HTML/JavaScript Morse code learning app that teaches **A–Z** and **0–9** using animated dots and dashes positioned directly over the strokes of each alphanumeric character.
 
 <img width="467" alt="image" src="https://github.com/user-attachments/assets/3f4b2d35-75ce-4938-bc30-6e36d39c22c3" />
