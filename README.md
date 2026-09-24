@@ -40,6 +40,7 @@ The app combines a visual mnemonic approach with Morse audio, animation, drillin
 - Based on these Glyphs
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/d5640524-4f22-45d6-8162-d0f56298f524" />
 
+-Google Morse trainer : https://morse.withgoogle.com/learn/
 
 ## Files
 
