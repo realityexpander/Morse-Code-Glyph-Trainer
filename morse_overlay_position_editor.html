@@ -105,6 +105,21 @@
     fill:var(--select);
     filter:drop-shadow(0 0 4px rgba(255,191,0,.6));
   }
+  .animation-active .mark-shape{
+    opacity:.12;
+    transition:opacity .16s ease,filter .16s ease;
+  }
+  .animation-active .mark.played .mark-shape,
+  .animation-active .mark.animating .mark-shape{
+    opacity:1;
+    stroke:var(--accent);
+    fill:var(--accent);
+    filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 75%, transparent));
+  }
+  .animation-active .mark.played .index-label,
+  .animation-active .mark.animating .index-label{
+    opacity:.25;
+  }
   .crosshair{stroke:var(--select);stroke-width:1.25;stroke-dasharray:4 4;pointer-events:none}
   .index-label{
     fill:var(--panel);
@@ -208,6 +223,7 @@
         <button class="btn" type="button" id="prevChar">← Prev</button>
         <select class="select" id="charSelect" aria-label="Character"></select>
         <button class="btn" type="button" id="nextChar">Next →</button>
+        <button class="btn primary" type="button" id="replayAnimation">▶ Replay Animation + Tones</button>
         <span class="grow"></span>
         <label class="row"><input type="checkbox" id="showGrid" checked> Grid</label>
         <label class="row"><input type="checkbox" id="snapGrid"> Snap 5</label>
@@ -298,181 +314,7 @@
 
   const ORDER = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"];
 
-  // V1 // Starting positions from the current trainer. You can completely replace them by editing.
-  // const INITIAL = {
-  //   A:[[165,280,-63],[252,235,63]],
-  //   B:[[155,165,90],[235,175,0],[240,245,0],[235,312,0]],
-  //   C:[[275,155,-18],[165,188,90],[165,282,90],[275,322,18]],
-  //   D:[[155,170,90],[268,225,90],[232,312,0]],
-  //   E:[[165,242,0]],
-  //   F:[[155,168,90],[175,168,0],[180,242,0],[160,318,90]],
-  //   G:[[275,155,-18],[165,188,90],[240,288,0]],
-  //   H:[[155,168,90],[155,255,90],[285,168,90],[285,255,90]],
-  //   I:[[220,170,90],[220,290,90]],
-  //   J:[[273,160,0],[285,220,90],[255,300,0],[188,300,0]],
-  //   K:[[155,170,90],[220,222,-42],[255,295,42]],
-  //   L:[[155,175,90],[155,265,90],[210,315,0],[285,315,0]],
-  //   M:[[150,292,90],[220,212,58]],
-  //   N:[[155,292,90],[250,232,56]],
-  //   O:[[220,150,0],[287,220,90],[220,320,0]],
-  //   P:[[155,302,90],[240,165,0],[280,215,90],[225,252,0]],
-  //   Q:[[220,150,0],[287,220,90],[220,320,0],[283,307,45]],
-  //   R:[[155,302,90],[240,165,0],[240,285,42]],
-  //   S:[[248,156,-18],[190,225,0],[245,307,18]],
-  //   T:[[220,170,90]],
-  //   U:[[155,225,90],[285,225,90],[220,315,0]],
-  //   V:[[168,188,68],[220,292,0],[272,188,-68],[220,327,0]],
-  //   W:[[150,200,74],[200,290,0],[245,290,0]],
-  //   X:[[180,180,45],[260,180,-45],[180,292,-45],[260,292,45]],
-  //   Y:[[175,172,45],[265,172,-45],[220,278,90],[220,324,0]],
-  //   Z:[[220,160,0],[258,212,-45],[202,272,-45],[220,320,0]],
-  //   "0":[[220,150,0],[287,205,90],[287,280,90],[220,320,0],[153,235,90]],
-  //   "1":[[198,188,-45],[228,162,90],[228,222,90],[228,282,90],[228,322,0]],
-  //   "2":[[186,165,0],[252,165,0],[270,220,-35],[215,276,-35],[220,322,0]],
-  //   "3":[[195,160,0],[258,182,-18],[235,240,0],[258,292,18],[205,323,0]],
-  //   "4":[[168,228,90],[188,278,0],[245,242,0],[270,182,90],[270,308,90]],
-  //   "5":[[240,160,0],[175,192,90],[212,238,0],[260,284,18],[212,322,0]],
-  //   "6":[[245,160,-25],[175,205,90],[175,285,90],[232,322,0],[272,275,90]],
-  //   "7":[[190,160,0],[252,160,0],[268,208,-65],[238,268,-65],[212,322,-65]],
-  //   "8":[[220,152,0],[282,206,90],[220,238,0],[282,286,90],[220,322,0]],
-  //   "9":[[220,158,0],[282,206,90],[220,242,0],[258,286,-55],[214,322,0]]
-  // };
-
- // V2 // Starting positions from the current trainer. You can completely replace them by editing.
- //  const INITIAL = {
- //    A:[[220,127,-63],[220,258,0]],
- //    B:[[155,207,90],[219,127,0],[220,206,0],[222,296,0]],
- //    C:[[266,129,35],[149,200,90],[184,286,35],[288,266,18]],
- //    D:[[158,209,90],[266,137,90],[266,280,0]],
- //    E:[[174,204,0]],
- //    F:[[283,126,90],[176,131,0],[174,274,90],[246,208,90]],
- //    G:[[271,131,35],[179,286,35],[305,214,0]],
- //    H:[[149,127,90],[151,290,90],[292,127,90],[291,290,90]],
- //    I:[[220,124,90],[220,290,90]],
- //    J:[[264,122,0],[264,187,90],[251,269,-51],[173,276,41]],
- //    K:[[269,136,-49],[155,236,-42],[275,268,62]],
- //    L:[[173,128,90],[173,263,90],[229,288,0],[285,288,0]],
- //    M:[[126,263,90],[316,262,90]],
- //    N:[[148,264,90],[291,284,56]],
- //    O:[[159,151,-51],[285,152,54],[220,294,0]],
- //    P:[[162,168,90],[221,120,0],[220,211,0],[289,166,0]],
- //    Q:[[160,149,-45],[281,150,45],[273,279,0],[163,278,38]],
- //    R:[[157,297,90],[221,210,0],[285,297,42]],
- //    S:[[215,117,-18],[215,204,0],[216,299,18]],
- //    T:[[219,126,0]],
- //    U:[[149,128,90],[289,127,90],[220,294,0]],
- //    V:[[143,124,68],[296,124,0],[221,267,-68],[221,302,0]],
- //    W:[[103,121,74],[167,267,-70],[305,267,-76]],
- //    X:[[169,140,58],[256,164,-45],[183,248,-45],[270,267,57]],
- //    Y:[[169,147,57],[222,207,-45],[272,148,-57],[221,272,-90]],
- //    Z:[[188,123,0],[228,199,-45],[146,291,-45],[297,292,0]],
- //    "0":[[219,116,0],[277,198,90],[259,279,-45],[186,281,45],[163,197,90]],
- //    "1":[[165,174,-45],[238,131,90],[237,199,90],[237,269,90],[237,325,0]],
- //    "2":[[165,151,0],[216,121,0],[271,154,-90],[181,271,-45],[262,291,0]],
- //    "3":[[167,140,0],[223,201,-18],[165,271,0],[263,142,53],[264,282,-40]],
- //    "4":[[261,118,90],[152,247,0],[259,249,0],[298,249,90],[261,329,0]],
- //    "5":[[276,125,0],[183,127,90],[171,200,0],[278,240,18],[173,282,0]],
- //    "6":[[257,124,33],[168,167,90],[169,254,90],[226,301,0],[275,254,90]],
- //    "7":[[174,125,0],[262,125,0],[247,182,-65],[219,239,-65],[203,296,-65]],
- //    "8":[[219,115,0],[221,201,0],[222,297,0],[201,334,90],[249,334,0]],
- //    "9":[[159,173,-90],[215,117,0],[276,177,90],[264,279,-46],[173,282,0]]
- //  };
-
-  // V3 // const INITIAL = {
-  //   A:[[220,127,-63],[218,246,0]],
-  //   B:[[155,207,90],[218,119,0],[220,206,0],[220,295,0]],
-  //   C:[[224,124,0],[149,200,90],[225,297,0],[288,261,18]],
-  //   D:[[158,209,90],[266,137,90],[266,280,0]],
-  //   E:[[165,203,0]],
-  //   F:[[283,122,90],[176,124,0],[174,274,90],[248,204,90]],
-  //   G:[[224,124,0],[225,299,0],[282,216,0]],
-  //   H:[[149,127,90],[151,290,90],[290,124,90],[291,290,90]],
-  //   I:[[220,124,90],[220,290,90]],
-  //   J:[[264,122,0],[264,187,90],[247,274,-51],[173,276,41]],
-  //   K:[[270,137,-46],[155,236,-42],[270,269,55]],
-  //   L:[[173,128,90],[175,274,90],[233,293,0],[290,293,0]],
-  //   M:[[133,263,90],[310,264,90]],
-  //   N:[[155,269,90],[277,283,56]],
-  //   O:[[159,151,-51],[285,152,54],[222,297,0]],
-  //   P:[[162,168,90],[221,120,0],[220,211,0],[289,166,0]],
-  //   Q:[[160,149,-45],[281,150,45],[273,279,0],[163,278,38]],
-  //   R:[[157,297,90],[209,210,0],[285,297,42]],
-  //   S:[[215,117,-18],[215,204,0],[216,299,18]],
-  //   T:[[216,117,0]],
-  //   U:[[149,128,90],[289,127,90],[217,298,0]],
-  //   V:[[143,124,68],[296,124,0],[221,271,-68],[221,302,0]],
-  //   W:[[103,121,74],[162,266,-70],[304,262,-70]],
-  //   X:[[181,139,58],[256,164,-45],[183,248,-45],[270,267,57]],
-  //   Y:[[169,147,57],[222,207,-45],[272,148,-57],[221,272,-90]],
-  //   Z:[[188,123,0],[212,213,-45],[146,291,-45],[297,292,0]],
-  //   "0":[[219,116,0],[275,179,90],[259,279,-45],[186,281,45],[165,181,90]],
-  //   "1":[[165,174,-45],[238,131,90],[238,201,90],[238,272,90],[237,327,0]],
-  //   "2":[[165,151,0],[216,121,0],[265,156,-90],[181,271,-45],[256,292,0]],
-  //   "3":[[167,140,0],[223,201,-18],[165,271,0],[255,140,53],[255,285,-40]],
-  //   "4":[[258,116,90],[161,250,0],[251,251,0],[293,253,90],[255,328,0]],
-  //   "5":[[269,122,0],[183,127,90],[171,200,0],[270,248,18],[173,282,0]],
-  //   "6":[[250,122,33],[168,167,90],[169,254,90],[222,302,0],[275,254,90]],
-  //   "7":[[192,125,0],[262,125,0],[243,188,-65],[217,239,-65],[200,300,-65]],
-  //   "8":[[219,115,0],[219,199,0],[222,297,0],[188,336,90],[252,336,0]],
-  //   "9":[[166,172,-90],[215,117,0],[267,174,90],[256,276,-46],[173,282,0]]
-  // };
-
-  // // V4
-  // const INITIAL = {
-  //   A:[[220,127,-63],[218,246,0]],
-  //   B:[[155,207,90],[218,119,0],[220,206,0],[220,295,0]],
-  //   C:[[224,124,0],[149,200,90],[225,297,0],[288,261,18]],
-  //   D:[[158,209,90],[266,137,90],[266,280,0]],
-  //   E:[[165,203,0]],
-  //   F:[[283,122,90],[176,124,0],[174,274,90],[248,204,90]],
-  //   G:[[224,124,0],[225,299,0],[282,216,0]],
-  //   H:[[149,127,90],[151,290,90],[290,124,90],[291,290,90]],
-  //   I:[[220,124,90],[220,290,90]],
-  //   //J:[[264,122,0],[264,187,90],[247,274,-51],[173,276,41]],
-  //   J:[[264,122,0],[264,187,90],[250,269,132],[173,271,-135]], 
-  //   K:[[270,137,-46],[155,236,-42],[270,269,55]],
-  //   L:[[173,128,90],[175,274,90],[233,293,0],[290,293,0]],
-  //   M:[[133,263,90],[310,264,90]],
-  //   N:[[155,269,90],[277,283,56]],
-  //   //O:[[159,151,-51],[285,152,54],[222,297,0]],
-  //   O:[[159,151,-51],[285,152,54],[219,294,180]],
-  //   P:[[162,168,90],[221,120,0],[220,211,0],[289,166,0]],
-  //   //Q:[[160,149,-45],[281,150,45],[273,279,0],[163,278,38]],
-  //   Q:[[160,149,-45],[281,150,45],[273,279,0],[160,277,-135]],
-  //   R:[[157,297,90],[209,210,0],[285,297,42]],
-  //   S:[[215,117,-18],[215,204,0],[216,299,18]],
-  //   T:[[216,117,0]],
-  //   U:[[149,128,90],[289,127,90],[217,298,0]],
-  //   V:[[143,124,68],[296,124,0],[221,271,-68],[221,302,0]],
-  //   W:[[103,121,74],[162,266,-70],[304,262,-70]],
-  //   //X:[[181,139,58],[256,164,-45],[183,248,-45],[270,267,57]],
-  //   X:[[181,139,58],[256,164,-45],[183,248,-45],[259,268,57]],
-  //   Y:[[169,147,57],[222,207,-45],[272,148,-57],[221,272,-90]],
-  //   //Z:[[188,123,0],[212,213,-45],[146,291,-45],[297,292,0]],
-  //   Z:[[188,123,0],[212,213,-45],[163,296,-45],[287,296,0]],
-  //   //"0":[[219,116,0],[275,179,90],[259,279,-45],[186,281,45],[165,181,90]],
-  //   "0":[[219,118,0],[275,180,90],[253,281,130],[183,281,-130],[165,181,-90]],
-  //   //"1":[[165,174,-45],[238,131,90],[238,201,90],[238,272,90],[237,327,0]],
-  //   "1":[[174,166,-45],[235,135,90],[235,205,90],[235,275,90],[237,328,0]],
-  //   //"2":[[165,151,0],[216,121,0],[265,156,-90],[181,271,-45],[256,292,0]],
-  //   "2":[[178,151,0],[221,121,0],[265,156,90],[188,271,135],[248,291,0]],
-  //   //"3":[[167,140,0],[223,201,-18],[165,271,0],[255,140,53],[255,285,-40]],
-  //   "3":[[167,140,0],[223,201,-18],[165,271,0],[255,140,53],[255,285,130]],
-  //   //"4":[[258,116,90],[161,250,0],[251,251,0],[293,253,90],[255,328,0]],
-  //   "4":[[259,117,90],[161,250,0],[260,251,0],[293,251,90],[251,328,0]],
-  //   //"5":[[269,122,0],[183,127,90],[171,200,0],[270,248,18],[173,282,0]],
-  //   "5":[[269,122,0],[185,123,90],[175,199,0],[270,248,18],[175,278,0]],
-  //   //"6":[[250,122,33],[168,167,90],[169,254,90],[222,302,0],[275,254,90]],
-  //   "6":[[250,122,-151],[168,167,90],[169,254,90],[222,302,0],[275,254,90]],
-  //   //"7":[[192,125,0],[262,125,0],[243,188,-65],[217,239,-65],[200,300,-65]],
-  //   "7":[[184,125,0],[255,125,0],[236,188,-65],[210,244,-65],[199,300,-65]],
-  //   //"8":[[219,115,0],[219,199,0],[222,297,0],[188,336,90],[252,336,0]],
-  //   "8":[[219,115,0],[219,199,0],[219,297,0],[186,336,90],[250,336,0]],
-  //   //"9":[[166,172,-90],[215,117,0],[267,174,90],[256,276,-46],[173,282,0]]
-  //   "9":[[166,174,-90],[213,120,0],[257,174,90],[256,282,135],[173,282,0]],
-  // };
-
-  // V5
+  // Starting positions from the current trainer. You can completely replace them by editing.
   const INITIAL = {
     A:[[220,127,-63],[218,246,0]],
     B:[[155,207,90],[218,119,0],[220,206,0],[220,295,0]],
@@ -483,7 +325,7 @@
     G:[[224,124,0],[225,299,0],[282,216,0]],
     H:[[149,127,90],[151,290,90],[290,124,90],[291,290,90]],
     I:[[220,124,90],[220,290,90]],
-    J:[[264,122,0],[264,187,90],[250,269,135],[173,271,-135]],
+    J:[[163,260,0],[212,288,0],[257,233,-90],[257,146,-90]],
     K:[[270,137,-46],[155,236,-42],[270,269,55]],
     L:[[173,128,90],[175,274,90],[233,293,0],[290,293,0]],
     M:[[133,263,90],[310,264,90]],
@@ -512,20 +354,22 @@
     "9":[[166,174,-90],[213,120,0],[257,174,90],[256,282,135],[173,282,0]]
   };
 
-
-
   const clone = obj => JSON.parse(JSON.stringify(obj));
   let P = clone(INITIAL);
   let edited = new Set();
   let charIndex = 0;
   let selectedMark = 0;
   let drag = null;
+  let animationToken = 0;
+  let animationTimer = null;
+  let audioCtx = null;
 
   const $ = id => document.getElementById(id);
   const els = {
     svg:$("svg"), stage:$("stage"), gridLayer:$("gridLayer"), glyphText:$("glyphText"),
     crosshairLayer:$("crosshairLayer"), marksLayer:$("marksLayer"), prevChar:$("prevChar"),
-    nextChar:$("nextChar"), charSelect:$("charSelect"), showGrid:$("showGrid"),
+    nextChar:$("nextChar"), replayAnimation:$("replayAnimation"),
+    charSelect:$("charSelect"), showGrid:$("showGrid"),
     snapGrid:$("snapGrid"), currentChar:$("currentChar"), morseCode:$("morseCode"),
     charGrid:$("charGrid"), markList:$("markList"), xInput:$("xInput"), yInput:$("yInput"),
     angleInput:$("angleInput"), angleRange:$("angleRange"), angleMinus:$("angleMinus"),
@@ -549,6 +393,169 @@
     const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
     for(const [k,v] of Object.entries(attrs)) n.setAttribute(k,String(v));
     return n;
+  }
+
+  const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
+
+  function stopAnimation(){
+    animationToken++;
+    if(animationTimer){
+      clearTimeout(animationTimer);
+      animationTimer = null;
+    }
+    els.marksLayer.classList.remove("animation-active");
+    [...els.marksLayer.querySelectorAll(".mark")].forEach(g=>{
+      g.classList.remove("played","animating");
+      const shape = g.querySelector(".dash-shape");
+      if(shape) restoreDashGeometry(shape);
+    });
+    els.replayAnimation.disabled = false;
+    els.replayAnimation.textContent = "▶ Replay Animation + Tones";
+  }
+
+  function restoreDashGeometry(shape){
+    if(!shape || !shape.classList.contains("dash-shape")) return;
+    shape.setAttribute("x1",shape.dataset.x1);
+    shape.setAttribute("y1",shape.dataset.y1);
+    shape.setAttribute("x2",shape.dataset.x2);
+    shape.setAttribute("y2",shape.dataset.y2);
+  }
+
+  function animateDash(shape,duration,token){
+    return new Promise(resolve=>{
+      if(!shape || !shape.classList.contains("dash-shape")){
+        resolve();
+        return;
+      }
+
+      const x1=Number(shape.dataset.x1);
+      const y1=Number(shape.dataset.y1);
+      const x2=Number(shape.dataset.x2);
+      const y2=Number(shape.dataset.y2);
+
+      // Match the Trainer: begin as a rounded dot at one endpoint and
+      // extend to the full dash during the entire dash tone.
+      shape.setAttribute("x1",x1);
+      shape.setAttribute("y1",y1);
+      shape.setAttribute("x2",x1);
+      shape.setAttribute("y2",y1);
+
+      const started=performance.now();
+
+      function frame(now){
+        if(token!==animationToken){
+          restoreDashGeometry(shape);
+          resolve();
+          return;
+        }
+
+        const progress=Math.min(1,(now-started)/duration);
+        shape.setAttribute("x2",x1+(x2-x1)*progress);
+        shape.setAttribute("y2",y1+(y2-y1)*progress);
+
+        if(progress<1){
+          requestAnimationFrame(frame);
+        }else{
+          restoreDashGeometry(shape);
+          resolve();
+        }
+      }
+
+      requestAnimationFrame(frame);
+    });
+  }
+
+  async function unlockAudio(){
+    try{
+      const Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx) return null;
+      if(audioCtx?.state==="closed") audioCtx=null;
+      if(!audioCtx) audioCtx=new Ctx();
+      if(audioCtx.state!=="running"){
+        try{ await audioCtx.resume(); }catch(_){}
+      }
+      return audioCtx.state==="running" ? audioCtx : null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  async function tone(ms){
+    const ctx=audioCtx?.state==="running" ? audioCtx : null;
+    if(!ctx) return;
+
+    const start=ctx.currentTime+0.005;
+    const stop=start+ms/1000;
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+
+    osc.type="sine";
+    osc.frequency.setValueAtTime(650,start);
+    gain.gain.setValueAtTime(0.0001,start);
+    gain.gain.exponentialRampToValueAtTime(0.20,start+0.01);
+    gain.gain.setValueAtTime(0.20,Math.max(start+0.011,stop-0.018));
+    gain.gain.exponentialRampToValueAtTime(0.0001,stop);
+
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(stop+0.02);
+
+    await sleep(ms);
+    try{ osc.disconnect(); gain.disconnect(); }catch(_){}
+  }
+
+  async function animateCurrent(){
+    stopAnimation();
+    const token=++animationToken;
+    const code=MORSE[currentChar()];
+    const groups=[...els.marksLayer.querySelectorAll(".mark")];
+    const dit=180;
+    const intra=105;
+
+    els.marksLayer.classList.add("animation-active");
+    els.replayAnimation.disabled=true;
+    els.replayAnimation.textContent="Animating…";
+
+    for(let i=0;i<code.length;i++){
+      if(token!==animationToken) return;
+
+      const group=groups[i];
+      const shape=group?.querySelector(".mark-shape");
+      group?.classList.add("animating");
+
+      const duration=code[i]==="." ? dit : dit*3;
+
+      if(code[i]==="-"){
+        await Promise.all([
+          tone(duration),
+          animateDash(shape,duration,token)
+        ]);
+      }else{
+        await Promise.all([
+          tone(duration),
+          sleep(duration)
+        ]);
+      }
+
+      if(token!==animationToken) return;
+      group?.classList.remove("animating");
+      group?.classList.add("played");
+      await sleep(intra);
+    }
+
+    if(token!==animationToken) return;
+    els.marksLayer.classList.remove("animation-active");
+    groups.forEach(g=>g.classList.remove("played","animating"));
+    els.replayAnimation.disabled=false;
+    els.replayAnimation.textContent="▶ Replay Animation + Tones";
+  }
+
+  function scheduleAnimation(delay=40){
+    if(animationTimer) clearTimeout(animationTimer);
+    animationTimer=setTimeout(()=>{
+      animationTimer=null;
+      animateCurrent();
+    },delay);
   }
 
   function buildGrid(){
@@ -580,6 +587,7 @@
   }
 
   function render(){
+    stopAnimation();
     const ch = currentChar();
     const code = MORSE[ch];
     els.charSelect.value = ch;
@@ -617,9 +625,15 @@
       const rad = a*Math.PI/180;
       const dx = Math.cos(rad)*len/2;
       const dy = Math.sin(rad)*len/2;
+      const x1=x-dx, y1=y-dy, x2=x+dx, y2=y+dy;
+      const dashShape=makeSvg("line",{x1:x1,y1:y1,x2:x2,y2:y2,"stroke-width":15,"stroke-linecap":"round",class:"mark-shape dash-shape"});
+      dashShape.dataset.x1=x1;
+      dashShape.dataset.y1=y1;
+      dashShape.dataset.x2=x2;
+      dashShape.dataset.y2=y2;
       g.append(
-        makeSvg("line",{x1:x-dx,y1:y-dy,x2:x+dx,y2:y+dy,class:"hit"}),
-        makeSvg("line",{x1:x-dx,y1:y-dy,x2:x+dx,y2:y+dy,"stroke-width":15,"stroke-linecap":"round",class:"mark-shape"}),
+        makeSvg("line",{x1:x1,y1:y1,x2:x2,y2:y2,class:"hit"}),
+        dashShape,
         makeSvg("text",{x:x,y:y+0.5,class:"index-label"})
       );
     }
@@ -673,6 +687,8 @@
     charIndex = (i + ORDER.length) % ORDER.length;
     selectedMark = 0;
     render();
+    unlockAudio();
+    scheduleAnimation();
   }
 
   function pointerToSvg(e){
@@ -809,6 +825,10 @@
   els.prevChar.addEventListener("click",()=>setCharacter(charIndex-1));
   els.nextChar.addEventListener("click",()=>setCharacter(charIndex+1));
   els.charSelect.addEventListener("change",()=>setCharacter(ORDER.indexOf(els.charSelect.value)));
+  els.replayAnimation.addEventListener("click",async()=>{
+    await unlockAudio();
+    animateCurrent();
+  });
   els.showGrid.addEventListener("change",buildGrid);
   els.snapGrid.addEventListener("change",()=>{});
 
@@ -855,7 +875,11 @@
     P=clone(INITIAL); edited.clear(); charIndex=0; selectedMark=0; render(); setStatus("All data reset.");
   });
 
+  document.addEventListener("pointerdown",()=>{ void unlockAudio(); },{passive:true,capture:true});
+  document.addEventListener("touchstart",()=>{ void unlockAudio(); },{passive:true,capture:true});
+
   document.addEventListener("keydown",e=>{
+    void unlockAudio();
     const tag=e.target?.tagName?.toLowerCase();
     if(tag==="input"||tag==="textarea"||tag==="select") return;
     const step=e.shiftKey?10:1;
@@ -872,6 +896,7 @@
   initSelectors();
   buildGrid();
   render();
+  window.addEventListener("load",()=>scheduleAnimation(150),{once:true});
 })();
 </script>
 </body>
