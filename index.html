@@ -278,6 +278,7 @@
     <button class="tab active" type="button" data-mode="learn">Learn</button>
     <button class="tab" type="button" data-mode="drillDots">Drill Dots &amp; Dashes</button>
     <button class="tab" type="button" data-mode="drillGlyphs">Drill Glyphs</button>
+    <button class="tab" type="button" data-mode="noGlyph">No Glyph</button>
     <button class="tab" type="button" data-mode="chart">Chart</button>
   </nav>
 
@@ -307,6 +308,7 @@
           <text id="glyphText" x="220" y="315" text-anchor="middle" class="glyph"
             font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="300" font-weight="900">A</text>
           <g id="marksLayer"></g>
+          <g id="linearLayer"></g>
         </svg>
       </div>
 
@@ -376,6 +378,24 @@
           <div class="stat"><strong id="glyphCorrectStat">0</strong><span>Correct</span></div>
           <div class="stat"><strong id="glyphAttemptStat">0</strong><span>Attempts</span></div>
           <div class="stat"><strong id="glyphAccuracyStat">—</strong><span>Accuracy</span></div>
+        </div>
+      </div>
+
+      <div id="noGlyphBox" class="drill-box hidden">
+        <h2>No Glyph — Which character is this?</h2>
+        <p class="help">Only standard straight-line Morse code is shown. There is no glyph-shape or dot/dash-placement hint until you Check or Reveal.</p>
+        <input id="noGlyphAnswer" class="char-answer" type="text" maxlength="1" inputmode="text"
+          autocomplete="off" autocapitalize="characters" aria-label="No Glyph character answer" placeholder="A–Z or 0–9">
+        <div class="controls" style="justify-content:flex-start">
+          <button class="btn primary" type="button" id="checkNoGlyphBtn">Check</button>
+          <button class="btn" type="button" id="revealNoGlyphBtn">Reveal</button>
+          <button class="btn" type="button" id="newNoGlyphBtn">New code</button>
+        </div>
+        <div class="feedback" id="noGlyphFeedback"></div>
+        <div class="stats">
+          <div class="stat"><strong id="noGlyphCorrectStat">0</strong><span>Correct</span></div>
+          <div class="stat"><strong id="noGlyphAttemptStat">0</strong><span>Attempts</span></div>
+          <div class="stat"><strong id="noGlyphAccuracyStat">—</strong><span>Accuracy</span></div>
         </div>
       </div>
 
@@ -454,7 +474,7 @@
   const els = {
     tabs:[...ROOT.querySelectorAll(".tab")],
     trainerView:$("trainerView"), chartView:$("chartView"), chartGrid:$("chartGrid"),
-    glyphText:$("glyphText"), marksLayer:$("marksLayer"), morseReadable:$("morseReadable"),
+    glyphText:$("glyphText"), marksLayer:$("marksLayer"), linearLayer:$("linearLayer"), morseReadable:$("morseReadable"),
     characterLabel:$("characterLabel"), positionLabel:$("positionLabel"),
     prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), playBtn:$("playBtn"), randomBtn:$("randomBtn"),
     speedRange:$("speedRange"), speedLabel:$("speedLabel"),
@@ -471,6 +491,10 @@
     checkGlyphBtn:$("checkGlyphBtn"), revealGlyphBtn:$("revealGlyphBtn"), newGlyphBtn:$("newGlyphBtn"),
     glyphFeedback:$("glyphFeedback"), glyphCorrectStat:$("glyphCorrectStat"),
     glyphAttemptStat:$("glyphAttemptStat"), glyphAccuracyStat:$("glyphAccuracyStat"),
+    noGlyphBox:$("noGlyphBox"), noGlyphAnswer:$("noGlyphAnswer"),
+    checkNoGlyphBtn:$("checkNoGlyphBtn"), revealNoGlyphBtn:$("revealNoGlyphBtn"), newNoGlyphBtn:$("newNoGlyphBtn"),
+    noGlyphFeedback:$("noGlyphFeedback"), noGlyphCorrectStat:$("noGlyphCorrectStat"),
+    noGlyphAttemptStat:$("noGlyphAttemptStat"), noGlyphAccuracyStat:$("noGlyphAccuracyStat"),
     svgTitle:$("svgTitle"), svgDesc:$("svgDesc")
   };
 
@@ -487,7 +511,8 @@
 
   const stats = {
     drillDots:{correct:0,attempts:0},
-    drillGlyphs:{correct:0,attempts:0}
+    drillGlyphs:{correct:0,attempts:0},
+    noGlyph:{correct:0,attempts:0}
   };
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve,ms));
@@ -514,6 +539,10 @@
       learnStartTimer = null;
     }
     [...els.marksLayer.children].forEach(n=>{
+      n.classList.remove("on");
+      restoreDashGeometry(n);
+    });
+    [...els.linearLayer.children].forEach(n=>{
       n.classList.remove("on");
       restoreDashGeometry(n);
     });
@@ -602,6 +631,63 @@
     });
   }
 
+  function renderLinearMorse(code){
+    els.linearLayer.replaceChildren();
+
+    const symbols = [...code];
+    const widths = symbols.map(sym=>sym === "." ? 18 : 50);
+    const gap = 28;
+    const totalWidth = widths.reduce((sum,w)=>sum+w,0) + gap*Math.max(0,symbols.length-1);
+    let cursor = 220 - totalWidth/2;
+
+    symbols.forEach((sym,i)=>{
+      const width = widths[i];
+      const centerX = cursor + width/2;
+      els.linearLayer.appendChild(markElement(sym,[centerX,220,0]));
+      cursor += width + gap;
+    });
+  }
+
+  async function animateLinearMorse(){
+    stopAnimation();
+    const token = ++runToken;
+    els.playBtn.disabled = true;
+    els.playBtn.textContent = "Animating…";
+
+    const code = MORSE[currentChar()];
+    const speed = Number(els.speedRange.value);
+    const dit = Math.round(180/speed);
+    const intra = Math.round(105/speed);
+    const marks = [...els.linearLayer.children];
+
+    els.linearLayer.style.visibility = "visible";
+
+    for(let i=0;i<code.length;i++){
+      if(token !== runToken) return;
+
+      marks[i]?.classList.add("on");
+      const dur = code[i] === "." ? dit : dit*3;
+
+      if(code[i] === "-"){
+        await Promise.all([
+          tone(dur),
+          animateDash(marks[i],dur,token)
+        ]);
+      }else{
+        await Promise.all([
+          tone(dur),
+          sleep(dur)
+        ]);
+      }
+
+      if(token !== runToken) return;
+      await sleep(intra);
+    }
+
+    if(token !== runToken) return;
+    updatePlayButton();
+  }
+
   function renderReadable(code){
     els.morseReadable.replaceChildren();
     [...code].forEach(sym=>{
@@ -621,11 +707,15 @@
     els.glyphText.textContent = ch;
     els.marksLayer.replaceChildren();
     [...code].forEach((sym,i)=>els.marksLayer.appendChild(markElement(sym,P[ch][i])));
+    renderLinearMorse(code);
     renderReadable(code);
 
     const isLearn = mode === "learn";
     const isDots = mode === "drillDots";
     const isGlyphs = mode === "drillGlyphs";
+    const isNoGlyph = mode === "noGlyph";
+
+    els.linearLayer.style.visibility = "hidden";
 
     if(isLearn){
       els.characterLabel.textContent = `Character ${ch}`;
@@ -652,6 +742,16 @@
       els.svgDesc.textContent = revealed
         ? `The ${ch} glyph with its revealed Morse pattern.`
         : `The ${ch} glyph with the Morse overlay hidden.`;
+    }else if(isNoGlyph){
+      els.characterLabel.textContent = revealed ? `Character ${ch}` : "Which character matches this Morse code?";
+      els.glyphText.style.visibility = revealed ? "visible" : "hidden";
+      els.marksLayer.style.visibility = revealed ? "visible" : "hidden";
+      els.linearLayer.style.visibility = revealed ? "hidden" : "visible";
+      els.morseReadable.style.visibility = revealed ? "visible" : "hidden";
+      els.svgTitle.textContent = revealed ? `Morse code for ${ch}` : "Standard Morse code challenge";
+      els.svgDesc.textContent = revealed
+        ? `The ${ch} glyph with its mnemonic Morse overlay.`
+        : "Standard Morse dots and dashes displayed in a straight horizontal line with no glyph hint.";
     }
 
     updatePlayButton();
@@ -667,6 +767,9 @@
     }else if(mode === "drillGlyphs"){
       els.playBtn.textContent = revealed ? "▶ Replay animation" : "Animation after Check/Reveal";
       els.playBtn.disabled = !revealed;
+    }else if(mode === "noGlyph"){
+      els.playBtn.textContent = revealed ? "▶ Replay glyph animation" : "▶ Replay Morse code";
+      els.playBtn.disabled = false;
     }
   }
 
@@ -743,12 +846,13 @@
     const marks = [...els.marksLayer.children];
     const readable = [...els.morseReadable.children];
 
-    if(mode !== "drillGlyphs" || revealed){
+    if((mode !== "drillGlyphs" && mode !== "noGlyph") || revealed){
       els.marksLayer.style.visibility = "visible";
     }
     if(mode === "learn" && els.codeToggle.checked) els.morseReadable.style.visibility = "visible";
     if(mode === "drillDots") els.morseReadable.style.visibility = "visible";
     if(mode === "drillGlyphs" && revealed) els.morseReadable.style.visibility = "visible";
+    if(mode === "noGlyph" && revealed) els.morseReadable.style.visibility = "visible";
 
     for(let i=0;i<code.length;i++){
       if(token !== runToken) return;
@@ -795,14 +899,25 @@
   }
 
   function clearFeedback(which){
-    const el = which === "dots" ? els.dotsFeedback : els.glyphFeedback;
+    const map = {
+      dots:els.dotsFeedback,
+      glyphs:els.glyphFeedback,
+      noGlyph:els.noGlyphFeedback
+    };
+    const el = map[which];
+    if(!el) return;
     el.textContent = "";
     el.className = "feedback";
   }
 
   function updateStats(which){
     const s = stats[which];
-    const prefix = which === "drillDots" ? "dots" : "glyph";
+    const prefixMap = {
+      drillDots:"dots",
+      drillGlyphs:"glyph",
+      noGlyph:"noGlyph"
+    };
+    const prefix = prefixMap[which];
     els[`${prefix}CorrectStat`].textContent = s.correct;
     els[`${prefix}AttemptStat`].textContent = s.attempts;
     els[`${prefix}AccuracyStat`].textContent = s.attempts ? `${Math.round(s.correct/s.attempts*100)}%` : "—";
@@ -818,6 +933,12 @@
     const enterMeansNew = mode === "drillGlyphs" && revealed;
     els.checkGlyphBtn.classList.toggle("primary", !enterMeansNew);
     els.newGlyphBtn.classList.toggle("primary", enterMeansNew);
+  }
+
+  function updateNoGlyphEnterHighlight(){
+    const enterMeansNew = mode === "noGlyph" && revealed;
+    els.checkNoGlyphBtn.classList.toggle("primary", !enterMeansNew);
+    els.newNoGlyphBtn.classList.toggle("primary", enterMeansNew);
   }
 
   function resetGlyphAnswer(){
@@ -845,6 +966,51 @@
     clearFeedback("glyphs");
     updateGlyphEnterHighlight();
     renderCharacter();
+  }
+
+  function newNoGlyphQuestion(){
+    index = chooseRandomIndex();
+    revealed = false;
+    els.noGlyphAnswer.readOnly = false;
+    els.noGlyphAnswer.value = "";
+    clearFeedback("noGlyph");
+    updateNoGlyphEnterHighlight();
+    renderCharacter();
+    unlockAudio().finally(()=>setTimeout(()=>animateLinearMorse(),30));
+    setTimeout(()=>els.noGlyphAnswer.focus(),50);
+  }
+
+  async function checkNoGlyph(revealOnly=false){
+    const expected = currentChar();
+    const guess = els.noGlyphAnswer.value.trim().toUpperCase().slice(0,1);
+
+    if(!revealOnly){
+      if(!/^[A-Z0-9]$/.test(guess)){
+        els.noGlyphFeedback.textContent = "Enter one letter A–Z or digit 0–9.";
+        els.noGlyphFeedback.className = "feedback bad";
+        return;
+      }
+
+      stats.noGlyph.attempts++;
+      if(guess === expected){
+        stats.noGlyph.correct++;
+        els.noGlyphFeedback.textContent = `Correct — ${expected} = ${prettyCode(MORSE[expected])}`;
+        els.noGlyphFeedback.className = "feedback good";
+      }else{
+        els.noGlyphFeedback.textContent = `Not quite. The character is ${expected} = ${prettyCode(MORSE[expected])}`;
+        els.noGlyphFeedback.className = "feedback bad";
+      }
+      updateStats("noGlyph");
+    }else{
+      els.noGlyphFeedback.textContent = `${expected} = ${prettyCode(MORSE[expected])}`;
+      els.noGlyphFeedback.className = "feedback";
+    }
+
+    revealed = true;
+    els.noGlyphAnswer.readOnly = true;
+    updateNoGlyphEnterHighlight();
+    renderCharacter();
+    await animateCurrent();
   }
 
   async function checkDots(revealOnly=false){
@@ -959,8 +1125,11 @@
     resetGlyphAnswer();
     els.charAnswer.readOnly = false;
     els.charAnswer.value = "";
+    els.noGlyphAnswer.readOnly = false;
+    els.noGlyphAnswer.value = "";
     updateDotsEnterHighlight();
     updateGlyphEnterHighlight();
+    updateNoGlyphEnterHighlight();
 
     els.tabs.forEach(t=>t.classList.toggle("active",t.dataset.mode===mode));
     const isChart = mode === "chart";
@@ -968,6 +1137,7 @@
     els.trainerView.classList.toggle("hidden",isChart);
     els.drillDotsBox.classList.toggle("hidden",mode!=="drillDots");
     els.drillGlyphsBox.classList.toggle("hidden",mode!=="drillGlyphs");
+    els.noGlyphBox.classList.toggle("hidden",mode!=="noGlyph");
 
     const isLearn = mode === "learn";
     els.prevBtn.classList.toggle("hidden",!isLearn);
@@ -988,6 +1158,10 @@
       els.keyboardHelp.innerHTML = 'Keyboard: <kbd>-</kbd> or <kbd>/</kbd> dash, <kbd>.</kbd> dot, <kbd>Delete</kbd>/<kbd>Backspace</kbd> erase, <kbd>Enter</kbd> check / next after reveal, <kbd>R</kbd> reveal, <kbd>Space</kbd> replay animation + tones after reveal, <kbd>N</kbd> new glyph.';
       els.modeNote.textContent = "Drill Glyphs shows only the character until you Check or Reveal the Morse pattern.";
       newGlyphQuestion();
+    }else if(mode === "noGlyph"){
+      els.keyboardHelp.innerHTML = 'Keyboard: <kbd>Enter</kbd> check / next after result, <kbd>Space</kbd> replay the current Morse presentation.';
+      els.modeNote.textContent = "No Glyph removes the mnemonic shape hint first. After your guess, the glyph and mnemonic overlay are revealed and animated.";
+      newNoGlyphQuestion();
     }
   }
 
@@ -1081,6 +1255,10 @@
     if(mode === "learn") animateCurrent({allowAutoAdvance:true});
     else if(mode === "drillDots") animateCurrent();
     else if(mode === "drillGlyphs" && revealed) animateCurrent();
+    else if(mode === "noGlyph"){
+      if(revealed) animateCurrent();
+      else animateLinearMorse();
+    }
   });
 
   els.speedRange.addEventListener("input",()=>{
@@ -1138,6 +1316,40 @@
       e.preventDefault();
       await unlockAudio();
       animateCurrent();
+    }
+  });
+
+  els.checkNoGlyphBtn.addEventListener("click",async()=>{
+    await unlockAudio();
+    checkNoGlyph(false);
+  });
+  els.revealNoGlyphBtn.addEventListener("click",async()=>{
+    await unlockAudio();
+    checkNoGlyph(true);
+  });
+  els.newNoGlyphBtn.addEventListener("click",async()=>{
+    await unlockAudio();
+    newNoGlyphQuestion();
+  });
+  els.noGlyphAnswer.addEventListener("input",()=>{
+    if(revealed) return;
+    els.noGlyphAnswer.value = els.noGlyphAnswer.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,1);
+    clearFeedback("noGlyph");
+  });
+  els.noGlyphAnswer.addEventListener("keydown",async e=>{
+    if(e.key === "Enter"){
+      e.preventDefault();
+      await unlockAudio();
+      if(revealed) newNoGlyphQuestion();
+      else checkNoGlyph(false);
+      return;
+    }
+
+    if(e.key === " "){
+      e.preventDefault();
+      await unlockAudio();
+      if(revealed) animateCurrent();
+      else animateLinearMorse();
     }
   });
 
@@ -1227,6 +1439,7 @@
   buildChart();
   updateStats("drillDots");
   updateStats("drillGlyphs");
+  updateStats("noGlyph");
   updateBrowserMutedIndicator();
 
   // Delay initial audio setup until the document has fully loaded and painted.
