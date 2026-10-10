@@ -199,6 +199,17 @@
   .feedback{min-height:1.5em;font-weight:700;margin-top:10px}
   .feedback.good{color:var(--good)}
   .feedback.bad{color:var(--bad)}
+  .success-check{
+    display:inline-block;
+    margin-right:.38em;
+    transform-origin:center;
+    animation:successCheckShrink 2s ease-out forwards;
+    vertical-align:middle;
+  }
+  @keyframes successCheckShrink{
+    from{transform:scale(5)}
+    to{transform:scale(1)}
+  }
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
   .stat{border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
   .stat strong{display:block;font-size:1.25rem}
@@ -290,7 +301,7 @@
           <div class="morse-readable" id="morseReadable" aria-live="polite"></div>
         </div>
         <div class="stage-status">
-          <span class="browser-muted" id="browserMuted" role="status" aria-label="Audio muted until first interaction" title="Audio muted until first click, touch, or key press">
+          <span class="browser-muted" id="browserMuted" role="status" aria-label="Audio muted until browser audio is enabled" title="Audio muted — click, touch, or press a key to enable sound">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"></path>
               <path d="M17 9l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
@@ -507,6 +518,8 @@
   let revealed = false;
   let audioCtx = null;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
+  let lastAnimationStartAt = 0;
   let lastRandom = -1;
 
   const stats = {
@@ -650,6 +663,7 @@
 
   async function animateLinearMorse(){
     stopAnimation();
+    lastAnimationStartAt = performance.now();
     const token = ++runToken;
     els.playBtn.disabled = true;
     els.playBtn.textContent = "Animating…";
@@ -774,43 +788,105 @@
   }
 
   function updateBrowserMutedIndicator(){
-    const unlocked = audioCtx?.state === "running" && audioUnlocked;
+    const unlocked = audioUnlocked && audioCtx?.state === "running";
     els.browserMuted.classList.toggle("hidden",unlocked);
   }
 
   async function unlockAudio(){
     if(!els.soundToggle.checked) return null;
-    try{
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if(!Ctx){
-        els.audioStatus.textContent = "Web Audio is not supported by this browser.";
-        return null;
-      }
-      if(!audioCtx) audioCtx = new Ctx();
-      if(audioCtx.state !== "running") await audioCtx.resume();
 
-      if(!audioUnlocked && audioCtx.state === "running"){
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        gain.gain.value = 0.00001;
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.01);
+    if(audioUnlocked && audioCtx?.state === "running"){
+      updateBrowserMutedIndicator();
+      return audioCtx;
+    }
+
+    // If another event from the SAME physical interaction is already
+    // unlocking audio (for example pointerdown followed by click),
+    // wait for that exact operation instead of returning null.
+    if(audioUnlockPromise) return audioUnlockPromise;
+
+    audioUnlockPromise = (async()=>{
+      try{
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if(!Ctx){
+          els.audioStatus.textContent = "Web Audio is not supported by this browser.";
+          return null;
+        }
+
+        if(audioCtx?.state === "closed"){
+          audioCtx = null;
+          audioUnlocked = false;
+        }
+
+        // Create the AudioContext only while handling an actual user gesture.
+        if(!audioCtx){
+          audioCtx = new Ctx();
+
+          audioCtx.onstatechange = ()=>{
+            const running = audioCtx?.state === "running";
+            audioUnlocked = Boolean(running);
+
+            // If Safari/browser suspends the context later, the muted icon
+            // immediately reappears. If it resumes, the icon disappears.
+            updateBrowserMutedIndicator();
+          };
+        }
+
+        if(audioCtx.state !== "running"){
+          try{
+            await audioCtx.resume();
+          }catch(_){
+            // Leave the muted icon visible; a later interaction can retry.
+          }
+        }
+
+        if(audioCtx.state !== "running"){
+          audioUnlocked = false;
+          updateBrowserMutedIndicator();
+          els.audioStatus.textContent = "Audio is muted until the browser accepts a click, touch, or key press.";
+          return null;
+        }
+
+        // Prime the Web Audio graph after the browser grants playback.
+        if(!audioUnlocked){
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          gain.gain.setValueAtTime(0.00001,audioCtx.currentTime);
+          osc.connect(gain).connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.015);
+
+          osc.onended = ()=>{
+            try{ osc.disconnect(); }catch(_){}
+            try{ gain.disconnect(); }catch(_){}
+          };
+        }
+
         audioUnlocked = true;
         els.audioStatus.textContent = "";
+        updateBrowserMutedIndicator();
+        return audioCtx;
+      }catch(_){
+        audioUnlocked = false;
+        updateBrowserMutedIndicator();
+        els.audioStatus.textContent = "Audio is muted until the browser accepts a click, touch, or key press.";
+        return null;
+      }finally{
+        audioUnlockPromise = null;
       }
-      updateBrowserMutedIndicator();
-      return audioCtx.state === "running" ? audioCtx : null;
-    }catch(err){
-      els.audioStatus.textContent = "Sound is blocked. Click or tap the page, then replay.";
-      return null;
-    }
+    })();
+
+    return audioUnlockPromise;
   }
 
   async function tone(ms){
     if(!els.soundToggle.checked) return;
-    const ctx = await unlockAudio();
-    if(!ctx) return;
+
+    // Never initialize or resume Web Audio from inside the animation.
+    // Before the first user interaction, visuals continue silently.
+    const ctx = audioCtx;
+    if(!audioUnlocked || !ctx || ctx.state !== "running") return;
 
     const start = ctx.currentTime + 0.005;
     const stop = start + ms/1000;
@@ -835,6 +911,7 @@
 
   async function animateCurrent({allowAutoAdvance=false}={}){
     stopAnimation();
+    lastAnimationStartAt = performance.now();
     const token = ++runToken;
     els.playBtn.disabled = true;
     els.playBtn.textContent = "Animating…";
@@ -908,6 +985,21 @@
     if(!el) return;
     el.textContent = "";
     el.className = "feedback";
+  }
+
+  function showSuccessFeedback(el,message){
+    el.replaceChildren();
+
+    const check = document.createElement("span");
+    check.className = "success-check";
+    check.textContent = "✅";
+    check.setAttribute("aria-hidden","true");
+
+    const text = document.createElement("span");
+    text.textContent = message;
+
+    el.append(check,text);
+    el.className = "feedback good";
   }
 
   function updateStats(which){
@@ -994,8 +1086,7 @@
       stats.noGlyph.attempts++;
       if(guess === expected){
         stats.noGlyph.correct++;
-        els.noGlyphFeedback.textContent = `Correct — ${expected} = ${prettyCode(MORSE[expected])}`;
-        els.noGlyphFeedback.className = "feedback good";
+        showSuccessFeedback(els.noGlyphFeedback,`Correct — ${expected} = ${prettyCode(MORSE[expected])}`);
       }else{
         els.noGlyphFeedback.textContent = `Not quite. The character is ${expected} = ${prettyCode(MORSE[expected])}`;
         els.noGlyphFeedback.className = "feedback bad";
@@ -1026,8 +1117,7 @@
       stats.drillDots.attempts++;
       if(guess === expected){
         stats.drillDots.correct++;
-        els.dotsFeedback.textContent = `Correct — ${expected} = ${prettyCode(MORSE[expected])}`;
-        els.dotsFeedback.className = "feedback good";
+        showSuccessFeedback(els.dotsFeedback,`Correct — ${expected} = ${prettyCode(MORSE[expected])}`);
       }else{
         els.dotsFeedback.textContent = `Not quite. The character is ${expected} = ${prettyCode(MORSE[expected])}`;
         els.dotsFeedback.className = "feedback bad";
@@ -1079,8 +1169,7 @@
       stats.drillGlyphs.attempts++;
       if(glyphAnswer === expected){
         stats.drillGlyphs.correct++;
-        els.glyphFeedback.textContent = `Correct — ${ch} = ${prettyCode(expected)}`;
-        els.glyphFeedback.className = "feedback good";
+        showSuccessFeedback(els.glyphFeedback,`Correct — ${ch} = ${prettyCode(expected)}`);
       }else{
         els.glyphFeedback.textContent = `Not quite. ${ch} = ${prettyCode(expected)}`;
         els.glyphFeedback.className = "feedback bad";
@@ -1207,30 +1296,46 @@
     });
   }
 
-  // Audio is explicitly unlocked on a genuine user gesture. This makes Safari/iOS
-  // and other autoplay-restricted browsers much more reliable.
-  let firstInteractionHandled = false;
+  // Any genuine user gesture may unlock or re-unlock Web Audio.
+  // We deliberately do not make this one-shot: browsers (especially mobile
+  // Safari) may suspend AudioContext after backgrounding the page.
+  async function handleAudioInteraction(){
+    if(!els.soundToggle.checked) return;
+    if(audioUnlocked && audioCtx?.state === "running") return;
 
-  async function handleFirstInteraction(){
-    if(firstInteractionHandled || !els.soundToggle.checked) return;
-
+    const interactionTime = performance.now();
     const ctx = await unlockAudio();
-    if(ctx?.state === "running"){
-      firstInteractionHandled = true;
-      updateBrowserMutedIndicator();
 
-      // If the opening Learn animation already ran silently, replay the
-      // current glyph once now that the browser has enabled audio.
+    if(ctx?.state !== "running") return;
+
+    // If the gesture was on a real app control, its click/keydown handler
+    // waits for the same audioUnlockPromise and starts its own animation.
+    // If the user simply clicked/touched the page to enable sound, replay
+    // the current presentation once now that audio is available.
+    setTimeout(()=>{
+      if(lastAnimationStartAt >= interactionTime) return;
+
       if(mode === "learn"){
         animateCurrent({allowAutoAdvance:true});
+      }else if(mode === "drillDots"){
+        animateCurrent();
+      }else if(mode === "drillGlyphs"){
+        if(revealed) animateCurrent();
+      }else if(mode === "noGlyph"){
+        if(revealed) animateCurrent();
+        else animateLinearMorse();
       }
-    }
+    },80);
   }
 
-  document.addEventListener("pointerdown",handleFirstInteraction,{passive:true,capture:true});
-  document.addEventListener("touchstart",handleFirstInteraction,{passive:true,capture:true});
-  document.addEventListener("mousedown",handleFirstInteraction,{passive:true,capture:true});
-  document.addEventListener("keydown",handleFirstInteraction,{capture:true});
+  // Avoid duplicate touch + pointer events for the same physical gesture.
+  if(window.PointerEvent){
+    document.addEventListener("pointerdown",handleAudioInteraction,{passive:true,capture:true});
+  }else{
+    document.addEventListener("touchstart",handleAudioInteraction,{passive:true,capture:true});
+    document.addEventListener("mousedown",handleAudioInteraction,{passive:true,capture:true});
+  }
+  document.addEventListener("keydown",handleAudioInteraction,{capture:true});
 
   els.tabs.forEach(t=>t.addEventListener("click",async()=>{
     await unlockAudio();
@@ -1271,11 +1376,21 @@
 
   els.soundToggle.addEventListener("change",async()=>{
     if(els.soundToggle.checked){
-      await unlockAudio();
-      if(audioCtx?.state === "running") els.audioStatus.textContent = "Audio ready.";
-      setTimeout(()=>{ if(els.audioStatus.textContent === "Audio ready.") els.audioStatus.textContent = ""; },1400);
+      // The checkbox change is itself a valid user gesture.
+      const ctx = await unlockAudio();
+      if(ctx?.state === "running"){
+        els.audioStatus.textContent = "Audio ready.";
+      }
+      updateBrowserMutedIndicator();
+      setTimeout(()=>{
+        if(els.audioStatus.textContent === "Audio ready."){
+          els.audioStatus.textContent = "";
+        }
+      },1400);
     }else{
+      audioUnlocked = false;
       els.audioStatus.textContent = "";
+      updateBrowserMutedIndicator();
     }
   });
 
@@ -1442,19 +1557,12 @@
   updateStats("noGlyph");
   updateBrowserMutedIndicator();
 
-  // Delay initial audio setup until the document has fully loaded and painted.
-  // This keeps the proven v8 audio implementation while avoiding startup races.
+  // Let the page finish loading and painting before the opening visual animation.
+  // Do NOT create the AudioContext here. The muted icon stays visible until
+  // a real click, touch, or key press successfully unlocks browser audio.
   const startInitialLearn = ()=>{
     setTimeout(()=>{
-      if(mode !== "learn") return;
-
-      // Begin setting up/resuming audio first, without blocking the UI.
-      void unlockAudio();
-
-      // Give the AudioContext a short head start, then show and play the glyph.
-      setTimeout(()=>{
-        if(mode === "learn") playLearnGlyph();
-      },40);
+      if(mode === "learn") playLearnGlyph();
     },150);
   };
 
