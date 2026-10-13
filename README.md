@@ -35,7 +35,7 @@ The app combines a visual mnemonic approach with Morse audio, animation, drillin
 - No server required
 - Works as a single standalone HTML page
 - From this conversation with ChatGPT 5.6 High mode
-  - https://chatgpt.com/share/6ab7beec-aa48-83ea-85f8-d56a2b248548
+  - https://chatgpt.com/share/6acea587-4604-83e9-a8a1-5edf33e16bb2
 
 - Based on these Glyphs
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/d5640524-4f22-45d6-8162-d0f56298f524" />
